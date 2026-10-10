@@ -137,7 +137,24 @@ table.sheet .stk{left:40px}
 table.sheet th small{font-weight:400;color:var(--muted)}
 table.sheet td.ro{background:var(--soft);min-width:64px}
 table.sheet th.ro{cursor:default}
-table.sheet .stk.wide{min-width:240px;max-width:none;padding:0}
+table.sheet .stk.wide{min-width:min(30rem,62vw);max-width:none;padding:0}
+/* ตารางนักเรียน: กว้างตามเนื้อหา (ไม่ยืดเต็มจอ) ช่องเพศ/เข้าเรียนพอดีค่า ช่องลบไม่ล้น */
+table.sheet.fit{width:auto;min-width:0}
+.tw.fit{width:max-content;max-width:100%}
+@media (max-width:600px){
+  table.sheet.fit .stk.wide{min-width:0;width:40vw;max-width:40vw}
+  table.sheet.fit .stk.wide input.gc{min-width:0}
+  table.sheet.fit th.sex,table.sheet.fit td.sex{width:3.6rem;min-width:3.6rem;max-width:3.6rem}
+  table.sheet.fit th.att,table.sheet.fit td.att{width:4.6rem;min-width:4.6rem;max-width:4.6rem}
+  table.sheet.fit th.del,table.sheet.fit td.del{width:3.4rem;min-width:3.4rem;padding:0 4px}
+  table.sheet.fit th{font-size:.75rem}
+}
+table.sheet th.ctr{text-align:center}
+table.sheet th.sex,table.sheet td.sex{width:5.5rem;min-width:5.5rem;max-width:5.5rem}
+table.sheet th.att,table.sheet td.att{width:6.5rem;min-width:6.5rem;max-width:6.5rem}
+table.sheet td.sex input.gc,table.sheet td.att input.gc{min-width:0}
+table.sheet th.del,table.sheet td.del{width:4.2rem;min-width:4.2rem;padding:0 6px;white-space:nowrap;cursor:default}
+table.sheet td.del .btn{min-height:30px;padding:.1rem .6rem}
 table.sheet td.wide input{min-width:180px}
 input.gc{display:block;width:100%;min-width:64px;height:2.4rem;border:0;border-radius:0;background:transparent;text-align:center;font-size:max(16px,1rem);padding:0 8px;color:inherit;font-family:inherit}
 input.gc:focus{outline:2px solid var(--brand);outline-offset:-2px;background:var(--panel);position:relative;z-index:1}

@@ -221,16 +221,16 @@
   function vStudents() {
     const n = students().length, rows = [];
     for (let r = L.stuFirst; r <= L.stuLast; r++) rows.push(r);
-    const head = `<tr><th class="no">ที่</th><th class="stk wide">ชื่อ - สกุล</th><th>เพศ</th><th>เข้าเรียน %</th><th class="no"></th></tr>`;
+    const head = `<tr><th class="no">ที่</th><th class="stk wide ctr">ชื่อ - สกุล</th><th class="sex">เพศ</th><th class="att">เข้าเรียน %</th><th class="del"></th></tr>`;
     const body = rows.map((r, i) => {
       const nm = txt(L.stu, r, 2), att = get(L.stu, r, 4);
       return `<tr data-row="${r}"><td class="no">${esc(get(L.stu, r, 1) ?? (r - 2))}</td>
-        ${gcell(L.stu, r, 2, 't', i, 0, { after: 'stu', cls: 'stk wide', align: 'left' })}${gcell(L.stu, r, 3, 'sex', i, 1)}${gcell(L.stu, r, 4, 'n', i, 2, { lo: 0, hi: 100 })}
-        <td class="no">${nm.trim() || att !== null || txt(L.stu, r, 3) ? `<button class="btn ghost sm" data-act="stu-del" data-r="${r}" aria-label="ลบนักเรียน">ลบ</button>` : ''}</td></tr>`;
+        ${gcell(L.stu, r, 2, 't', i, 0, { after: 'stu', cls: 'stk wide', align: 'left' })}${gcell(L.stu, r, 3, 'sex', i, 1, { cls: 'sex' })}${gcell(L.stu, r, 4, 'n', i, 2, { lo: 0, hi: 100, cls: 'att' })}
+        <td class="del">${nm.trim() || att !== null || txt(L.stu, r, 3) ? `<button class="btn ghost sm" data-act="stu-del" data-r="${r}" aria-label="ลบนักเรียน">ลบ</button>` : ''}</td></tr>`;
     }).join('');
     return `<div class="bar"><span><b>${n}</b> / ${rows.length} คน</span></div>
       <p class="sub">ใช้งานเหมือนชีท Excel: คลิกช่องแล้วพิมพ์ หรือคัดลอกหลายช่องจาก Excel / Google Sheets มาวาง (Ctrl+V) ได้ทันที · เพศพิมพ์ ช / ญ ได้ (ถ้าเว้นว่าง ระบบเดาจากคำนำหน้า)</p>
-      ${gridWrap('stu', head, body)}`;
+      ${gridWrap('stu', head, body, 'fit')}`;
   }
   function uiModal(o) {
     return new Promise((resolve) => {
@@ -404,7 +404,7 @@
   // ช่องแสดงผล (คำนวณ): อัปเดตเองหลังแก้ไขในตาราง
   const roHtml = (sheet, r, c, fmt) => { const v = get(sheet, r, c); return fmt === 'lvl' ? (v ? lvChip(String(v)) : '<span class="hint">–</span>') : fmt === 'pass' ? passChip(v === null ? '' : String(v)) : fmt === 'b' ? `<b>${v ?? '–'}</b>` : esc(v ?? '–'); };
   const rocell = (sheet, r, c, fmt) => `<td class="ro" data-ro="${esc(sheet)}|${r}|${c}|${fmt || ''}">${roHtml(sheet, r, c, fmt)}</td>`;
-  const gridWrap = (kind, head, body) => `<div class="tw"><table class="t sheet" data-grid="${kind}"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+  const gridWrap = (kind, head, body, cls) => `<div class="tw ${cls || ''}"><table class="t sheet ${cls || ''}" data-grid="${kind}"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
   function updateRo(scope) {
     $$('[data-ro]', scope).forEach(td => { const [s, r, c, f] = td.dataset.ro.split('|'); td.innerHTML = roHtml(s, +r, +c, f); });
   }
