@@ -8,7 +8,7 @@
   const esc = R.esc;
   const A = () => root.PPApp;
   const LEVELS = ['เริ่มต้น', 'พัฒนา', 'ชำนาญ', 'เชี่ยวชาญ'];
-  const U = { tab: 'home', sub: { data: 'school' }, scoreTerm: 1, slot: null, kind: 'trait', aTerm: 1, repMode: 'one', repTerm: 'sum', pendStu: new Set(), pendSub: new Set(), openNote: new Set() };
+  const U = { tab: 'home', sub: { data: 'school' }, scoreTerm: 1, slot: null, kind: 'trait', aTerm: 1, repMode: 'one', repTerm: 'sum', pendSub: new Set() };
   let L = null;
 
   // ---------------------------------------------------------------- เข้าถึงข้อมูลในเวิร์กบุ๊ก
@@ -99,6 +99,11 @@
       v.addEventListener('change', onChange);
       v.addEventListener('keydown', onKey);
       v.addEventListener('paste', onPaste);
+      // เลือกทั้งช่องเมื่อเข้าช่อง (พิมพ์ทับได้ทันทีเหมือน Excel) และกันคลิกเมาส์ยกเลิกการเลือก
+      v.addEventListener('focusin', (e) => { const el = e.target; if (el.matches && el.matches('input.gc')) { el.select(); el.dataset.fresh = '1'; } });
+      v.addEventListener('mouseup', (e) => { const el = e.target; if (el.dataset && el.dataset.fresh) { delete el.dataset.fresh; if (el.selectionStart === el.selectionEnd) el.select(); } });
+      v.addEventListener('input', (e) => { if (e.target.dataset) delete e.target.dataset.fresh; });
+      v.addEventListener('dblclick', (e) => { const el = e.target; if (el.matches && el.matches('input.gc[data-t=pass]')) { el.value = el.value === '' ? 'ผ่าน' : el.value === 'ผ่าน' ? 'ไม่ผ่าน' : ''; el.dispatchEvent(new Event('change', { bubbles: true })); el.select(); } });
       $('#tabbar').addEventListener('click', (e) => { const b = e.target.closest('[data-tab]'); if (b) go(b.dataset.tab); });
     }
     U.slot = null;
@@ -198,32 +203,20 @@
       <p class="hint">ตราจะแสดงในหน้าปก ปพ.5 และ ปพ.6 โดยอัตโนมัติ (ไฟล์ PNG/JPG)</p></div>${covBox}`;
   }
 
-  // --- นักเรียน
+  // --- นักเรียน (ตารางแบบชีท: ทุกแถวกรอก/วางได้ทันที)
   function vStudents() {
-    const list = students(); const have = new Set(list.map(s => s.r));
-    const pend = [...U.pendStu].filter(r => !have.has(r));
-    const rows = [...list.map(s => s.r), ...pend].sort((a, b) => a - b);
-    const body = rows.length ? rows.map(r => stuCard(r)).join('') : '<div class="card empty"><b>ยังไม่มีนักเรียน</b>กด “เพิ่มนักเรียน” หรือ “วางรายชื่อ” ด้านบน</div>';
-    const full = list.length + pend.length >= L.stuLast - L.stuFirst + 1;
-    return `<div class="bar"><span><b>${list.length}</b> / ${L.stuLast - L.stuFirst + 1} คน</span><span class="grow"></span>
-      <button class="btn" data-act="stu-paste">วางรายชื่อ</button><button class="btn primary" data-act="stu-add"${full ? ' disabled' : ''}>＋ เพิ่มนักเรียน</button></div>${body}`;
-  }
-  function stuCard(r) {
-    const sex = txt(L.stu, r, 3), att = get(L.stu, r, 4);
-    return `<div class="card item" data-row="${r}">
-      <div class="badge">${esc(get(L.stu, r, 1) ?? (r - 2))}</div>
-      <input class="in" ${bind(L.stu, r, 2, 't', ` data-old="${esc(txt(L.stu, r, 2))}" data-after="stu"`)} type="text" value="${esc(txt(L.stu, r, 2))}" placeholder="ชื่อ - สกุล" autocomplete="off">
-      <button class="btn danger sm" data-act="stu-del" data-r="${r}" aria-label="ลบนักเรียน">ลบ</button>
-      <div class="full row sp">
-        <div class="sexseg" role="group" aria-label="เพศ"><button data-act="sex" data-r="${r}" data-v="ชาย" class="${sex === 'ชาย' ? 'on' : ''}">ชาย</button><button data-act="sex" data-r="${r}" data-v="หญิง" class="${sex === 'หญิง' ? 'on' : ''}">หญิง</button></div>
-        <label class="row" style="gap:6px">เข้าเรียน <input class="in" style="width:92px;text-align:center" ${bind(L.stu, r, 4, 'n', ` data-old="${att === null ? '' : esc(att)}" data-lo="0" data-hi="100"`)} type="text" inputmode="decimal" value="${att === null ? '' : esc(att)}" placeholder="%"> %</label>
-      </div></div>`;
-  }
-  function addStudent() {
-    for (let r = L.stuFirst; r <= L.stuLast; r++) {
-      if (!txt(L.stu, r, 2).trim() && !U.pendStu.has(r)) { U.pendStu.add(r); refresh(); const el = $(`[data-row="${r}"] input[type=text]`); if (el) { el.focus(); el.scrollIntoView({ block: 'center' }); } return; }
-    }
-    A().toast('ครบจำนวนนักเรียนสูงสุดแล้ว', 'warn');
+    const n = students().length, rows = [];
+    for (let r = L.stuFirst; r <= L.stuLast; r++) rows.push(r);
+    const head = `<tr><th class="no">ที่</th><th class="stk wide">ชื่อ - สกุล</th><th>เพศ</th><th>เข้าเรียน %</th><th class="no"></th></tr>`;
+    const body = rows.map((r, i) => {
+      const nm = txt(L.stu, r, 2), att = get(L.stu, r, 4);
+      return `<tr data-row="${r}"><td class="no">${esc(get(L.stu, r, 1) ?? (r - 2))}</td>
+        ${gcell(L.stu, r, 2, 't', i, 0, { after: 'stu', cls: 'stk wide', align: 'left' })}${gcell(L.stu, r, 3, 'sex', i, 1)}${gcell(L.stu, r, 4, 'n', i, 2, { lo: 0, hi: 100 })}
+        <td class="no">${nm.trim() || att !== null || txt(L.stu, r, 3) ? `<button class="btn ghost sm" data-act="stu-del" data-r="${r}" aria-label="ลบนักเรียน">ลบ</button>` : ''}</td></tr>`;
+    }).join('');
+    return `<div class="bar"><span><b>${n}</b> / ${rows.length} คน</span></div>
+      <p class="sub">ใช้งานเหมือนชีท Excel: คลิกช่องแล้วพิมพ์ หรือคัดลอกหลายช่องจาก Excel / Google Sheets มาวาง (Ctrl+V) ได้ทันที · เพศพิมพ์ ช / ญ ได้ (ถ้าเว้นว่าง ระบบเดาจากคำนำหน้า)</p>
+      ${gridWrap('stu', head, body)}`;
   }
   function uiModal(o) {
     return new Promise((resolve) => {
@@ -235,33 +228,6 @@
       $('[data-m=ok]', rootEl).onclick = () => { const v = o.read ? o.read(rootEl) : true; close(v); };
       const f = $('textarea,input', rootEl); if (f) f.focus();
     });
-  }
-  async function pasteStudents() {
-    const free = []; for (let r = L.stuFirst; r <= L.stuLast; r++) if (!txt(L.stu, r, 2).trim()) free.push(r);
-    const v = await uiModal({
-      title: 'วางรายชื่อนักเรียน',
-      body: `<p class="hint">พิมพ์หรือวางทีละบรรทัด 1 คน (คัดลอกจาก Excel ได้) รับได้อีก ${free.length} คน<br>รูปแบบ: <b>ชื่อ-สกุล</b> หรือ <b>ชื่อ-สกุล [Tab] เพศ [Tab] เข้าเรียน%</b> — ถ้าชื่อขึ้นต้น เด็กชาย/ด.ช. หรือ เด็กหญิง/ด.ญ. ระบบเดาเพศให้</p><textarea id="pasteBox" placeholder="เด็กชายสมชาย ใจดี&#10;เด็กหญิงสมศรี รักเรียน"></textarea>`,
-      ok: 'เพิ่มรายชื่อ', read: (r) => $('#pasteBox', r).value,
-    });
-    if (v === null || !String(v).trim()) return;
-    const lines = String(v).replace(/\r/g, '').split('\n').map(x => x.trim()).filter(Boolean);
-    let n = 0, skipped = 0;
-    A().batch(() => {
-      for (const ln of lines) {
-        if (!free.length) { skipped++; continue; }
-        const parts = ln.split('\t').map(x => x.trim());
-        const name = parts[0].replace(/^\d+[.)\s]+/, '').trim(); if (!name) continue;
-        let sex = parts[1] || '';
-        if (/^(ช|ชาย|ด\.?ช\.?|เด็กชาย)$/.test(sex)) sex = 'ชาย'; else if (/^(ญ|หญิง|ด\.?ญ\.?|เด็กหญิง)$/.test(sex)) sex = 'หญิง'; else sex = '';
-        if (!sex) { if (/^(เด็กชาย|ด\.ช\.|ดช\.?)/.test(name)) sex = 'ชาย'; else if (/^(เด็กหญิง|ด\.ญ\.|ดญ\.?)/.test(name)) sex = 'หญิง'; }
-        const r = free.shift();
-        setv(L.stu, r, 2, name); if (sex) setv(L.stu, r, 3, sex);
-        const att = parts[2] ? Number(parts[2].replace('%', '')) : NaN; if (isFinite(att) && att >= 0 && att <= 100) setv(L.stu, r, 4, att);
-        n++;
-      }
-    });
-    const first = students()[0]; if (first && !currentStudent()) WB().setValue(L.sum, { r: 3, c: 2 }, first.name);
-    refresh(); A().toast('เพิ่มนักเรียน ' + n + ' คน' + (skipped ? ' (เกินจำนวนสูงสุด ข้าม ' + skipped + ' คน)' : ''), skipped ? 'warn' : 'ok');
   }
   async function delStudent(r) {
     const nm = txt(L.stu, r, 2);
@@ -277,7 +243,6 @@
         for (let c = 3; c <= 5; c++) setv(L.act(t), stuTraitRow(r), c, null);
       }
     });
-    U.pendStu.delete(r);
     if (currentStudent() === nm) { const f = students()[0]; WB().setValue(L.sum, { r: 3, c: 2 }, f ? f.name : null); }
     refresh();
   }
@@ -372,115 +337,118 @@
       <select data-act-change="subj">${subs.map(s => `<option value="${s.r}"${s.r === cur.r ? ' selected' : ''}>${esc(oneLine(s.name))}</option>`).join('')}</select>
       <button class="btn" data-act="subj-step" data-d="1" aria-label="วิชาถัดไป"${idx === subs.length - 1 ? ' disabled' : ''}>›</button></div>`;
     const termSeg = `<div class="bar" style="margin-top:10px">${seg([[1, 'เทอม 1'], [2, 'เทอม 2'], ['y', 'สรุปทั้งปี']], T, 'sterm')}</div>`;
-    let maxBox = '';
-    if (T !== 'y') {
-      const inds = activeInds(sc, T), mf = (c) => inputFor(sc, 4, c, { kind: 'n', mode: 'numeric', after: 'maxchg' });
-      maxBox = `<div class="card soft"><div class="hint" style="margin-bottom:6px">คะแนนเต็มรายตัวชี้วัด (คะแนนเก็บ = ผลรวมคะแนนตัวชี้วัด)</div>
-        <div class="maxbox">${inds.map((c, i) => field('ตัวชี้วัด ' + (i + 1) + ' เต็ม', mf(c))).join('')}
-        <div class="row indbtn"><button class="btn sm" data-act="ind-add"${inds.length >= NIND ? ' disabled' : ''}>＋ เพิ่มตัวชี้วัด</button><button class="btn sm" data-act="ind-del"${inds.length <= 1 ? ' disabled' : ''}>－ ลดตัวชี้วัด</button></div></div>
-        <div class="maxbox" style="margin-top:10px"><span class="hint">คะแนนเก็บ เต็ม <b>${num(sc, 4, SC[T].keep) ?? 0}</b></span>${field('คะแนนสอบ เต็ม', mf(SC[T].exam))}<span class="hint">รวมเต็ม <b id="maxsum">${num(sc, 4, SC[T].tot) ?? ''}</b></span></div></div>`;
-    }
-    else maxBox = `<div class="card soft"><span class="hint">คะแนนเต็มทั้งปี <b>${num(sc, 4, SC.year) ?? ''}</b> (เทอม 1 + เทอม 2) — ระดับคำนวณจากคะแนนรวมทั้งปี ตามเกณฑ์ ร้อยละ 75 / 65 / 55</span></div>`;
-    const rows = stu.map(st => scoreRow(sc, st, T)).join('');
-    const need = T === 'y' ? [] : scInputs(sc, T);
-    let filled = 0; for (const st of stu) for (const c of need) if (get(sc, stuScoreRow(st.r), c) !== null) filled++;
-    const prog = T === 'y' ? '' : `<div class="hint" style="margin:0 0 8px">กรอกแล้ว <b id="fillcnt">${filled}</b> / ${stu.length * need.length} ช่อง</div>`;
-    const tools = T === 'y' ? '' : `<div class="bar" style="margin:0 0 8px"><button class="btn" data-act="sc-paste">📋 วางคะแนนจาก Excel</button><span class="hint">หรือคัดลอกหลายช่องจาก Excel แล้ววางลงช่องคะแนนได้เลย</span></div>`;
-    return `${pickBar}${termSeg}${maxBox}${tools}${prog}<div class="srows" id="srows">${rows}</div>`;
-  }
-  function scoreRow(sc, st, T) {
-    const r = stuScoreRow(st.r);
-    const nameHtml = `<div class="badge">${esc(st.no)}</div><div class="sname">${esc(st.name)}</div>`;
+    const mxs = (c) => num(sc, 4, c) ?? '';
     if (T === 'y') {
-      const e = num(sc, r, SC[1].tot), h = num(sc, r, SC[2].tot), i = num(sc, r, SC.year);
-      return `<div class="srow yr" data-row="${st.r}">${nameHtml}<div class="inps"><span class="ro">${e ?? '–'}</span><span class="ro">${h ?? '–'}</span><span class="ro"><b>${i ?? '–'}</b></span></div><div class="res">${lvChip(txt(sc, r, SC.yearLvl))}</div></div>`;
+      const head = `<tr><th class="no">ที่</th><th class="stk">ชื่อ - สกุล</th><th>รวมเทอม 1<br><small>(${mxs(SC[1].tot)})</small></th><th>รวมเทอม 2<br><small>(${mxs(SC[2].tot)})</small></th><th>รวมทั้งปี<br><small>(${mxs(SC.year)})</small></th><th>ระดับทั้งปี</th></tr>`;
+      const body = stu.map(st => { const r = stuScoreRow(st.r); return `<tr><td class="no">${esc(st.no)}</td><td class="stk">${esc(st.name)}</td>${rocell(sc, r, SC[1].tot)}${rocell(sc, r, SC[2].tot)}${rocell(sc, r, SC.year, 'b')}${rocell(sc, r, SC.yearLvl, 'lvl')}</tr>`; }).join('');
+      return `${pickBar}${termSeg}<div class="card soft"><span class="hint">ระดับคำนวณจากคะแนนรวมทั้งปี ตามเกณฑ์ ร้อยละ 75 / 65 / 55</span></div>${gridWrap('score', head, body)}`;
     }
-    const tc = SC[T].tot, lc = SC[T].lvl, kc = SC[T].keep;
-    const mk = (c, lab) => `<label><span>${lab}</span><input type="text" inputmode="numeric" enterkeyhint="next" ${bind(sc, r, c, 'n', ` data-old="${esc(get(sc, r, c) ?? '')}" data-after="row" data-col="${c}"`)} value="${esc(get(sc, r, c) ?? '')}" autocomplete="off"${(num(sc, 4, c) ?? 0) > 0 ? ' placeholder="–"' : ' placeholder="ตั้งคะแนนเต็มก่อน" disabled'}></label>`;
-    const tot = num(sc, r, tc), max = num(sc, 4, tc);
-    const note = txt(sc, r, SC.note), noteOpen = U.openNote.has(st.r) || note;
-    return `<div class="srow" data-row="${st.r}" data-sc="${esc(sc)}" data-tc="${tc}" data-lc="${lc}" data-kc="${kc}">${nameHtml}
-      <div class="tot"><b data-role="tot">${tot ?? '–'}</b><span class="hint"> / ${max ?? ''}</span></div>
-      <div class="inps">${activeInds(sc, T).map((c, i) => mk(c, 'ตัวชี้วัด ' + (i + 1))).join('')}<label><span>เก็บ (รวม)</span><span class="ro" data-role="keep">${num(sc, r, kc) ?? '–'}</span></label>${mk(SC[T].exam, 'สอบ')}</div>
-      <div class="res"><span data-role="lvl">${lvChip(txt(sc, r, lc))}</span><button class="btn sm ghost" data-act="note" data-r="${st.r}">${note ? '📝 หมายเหตุ' : '＋ หมายเหตุ'}</button></div>
-      ${noteOpen ? `<div class="note"><input class="in" ${bind(sc, r, SC.note, 't', ` data-old="${esc(note)}"`)} type="text" value="${esc(note)}" placeholder="หมายเหตุ"></div>` : ''}</div>`;
+    const inds = activeInds(sc, T), mf = (c) => inputFor(sc, 4, c, { kind: 'n', mode: 'numeric', after: 'maxchg' });
+    const maxBox = `<div class="card soft"><div class="hint" style="margin-bottom:6px">คะแนนเต็มรายตัวชี้วัด (คะแนนเก็บ = ผลรวมคะแนนตัวชี้วัด)</div>
+      <div class="maxbox">${inds.map((c, i) => field('ตัวชี้วัด ' + (i + 1) + ' เต็ม', mf(c))).join('')}
+      <div class="row indbtn"><button class="btn sm" data-act="ind-add"${inds.length >= NIND ? ' disabled' : ''}>＋ เพิ่มตัวชี้วัด</button><button class="btn sm" data-act="ind-del"${inds.length <= 1 ? ' disabled' : ''}>－ ลดตัวชี้วัด</button></div></div>
+      <div class="maxbox" style="margin-top:10px"><span class="hint">คะแนนเก็บ เต็ม <b>${num(sc, 4, SC[T].keep) ?? 0}</b></span>${field('คะแนนสอบ เต็ม', mf(SC[T].exam))}<span class="hint">รวมเต็ม <b>${mxs(SC[T].tot)}</b></span></div></div>`;
+    // คอลัมน์ที่กรอกได้ (เรียงตามตาราง): ตัวชี้วัด..., สอบ, หมายเหตุ
+    const head = `<tr><th class="no">ที่</th><th class="stk">ชื่อ - สกุล</th>${inds.map((c, i) => `<th>ตัวชี้วัด ${i + 1}<br><small>(${mxs(c)})</small></th>`).join('')}
+      <th class="ro">เก็บ<br><small>(${mxs(SC[T].keep)})</small></th><th>สอบ<br><small>(${mxs(SC[T].exam)})</small></th><th class="ro">รวม<br><small>(${mxs(SC[T].tot)})</small></th><th class="ro">ระดับ</th><th class="wide">หมายเหตุ</th></tr>`;
+    const body = stu.map((st, i) => {
+      const r = stuScoreRow(st.r);
+      return `<tr><td class="no">${esc(st.no)}</td><td class="stk">${esc(st.name)}</td>
+        ${inds.map((c, j) => gcell(sc, r, c, 'n', i, j)).join('')}${rocell(sc, r, SC[T].keep)}${gcell(sc, r, SC[T].exam, 'n', i, inds.length)}${rocell(sc, r, SC[T].tot, 'b')}${rocell(sc, r, SC[T].lvl, 'lvl')}${gcell(sc, r, SC.note, 't', i, inds.length + 1, { cls: 'wide', align: 'left' })}</tr>`;
+    }).join('');
+    return `${pickBar}${termSeg}${maxBox}<p class="sub">ใช้งานเหมือนชีท Excel: คลิกช่องแล้วพิมพ์ ลูกศร/Enter เลื่อนช่อง หรือคัดลอกคะแนนหลายช่องจาก Excel มาวาง (Ctrl+V) ได้ทันที</p>${gridWrap('score', head, body)}`;
   }
+
+  // ---------------------------------------------------------------- ตารางแบบชีท (ใช้ร่วม นักเรียน / คะแนน / ประเมิน)
+  // ช่องกรอก: data-gr/data-gc = ตำแหน่งในตาราง (ใช้เลื่อนด้วยลูกศรและวางหลายช่อง)
+  function gcell(sheet, r, c, kind, gr, gc, o) {
+    o = o || {}; const raw = get(sheet, r, c); const v = raw === null || isPh(raw) ? '' : String(raw);
+    const dis = kind === 'n' && sheet !== L.stu && (num(sheet, 4, c) ?? 0) <= 0;
+    const extra = ` data-old="${esc(v)}" data-gr="${gr}" data-gc="${gc}" data-after="${o.after || 'grid'}"${o.lo !== undefined ? ` data-lo="${o.lo}" data-hi="${o.hi}"` : ''}`;
+    const cls = kind === 'pass' ? ` ${v === 'ผ่าน' ? 'ok' : v === 'ไม่ผ่าน' ? 'no' : ''}` : '';
+    return `<td class="gtd ${o.cls || ''}"><input class="gc${cls}" ${bind(sheet, r, c, kind)}${extra} type="text" value="${esc(v)}"${kind === 'n' ? ' inputmode="decimal"' : ''}${o.align ? ` style="text-align:${o.align}"` : ''} autocomplete="off" spellcheck="false"${dis ? ' disabled title="ตั้งคะแนนเต็มก่อน"' : ''}></td>`;
+  }
+  // ช่องแสดงผล (คำนวณ): อัปเดตเองหลังแก้ไขในตาราง
+  const roHtml = (sheet, r, c, fmt) => { const v = get(sheet, r, c); return fmt === 'lvl' ? (v ? lvChip(String(v)) : '<span class="hint">–</span>') : fmt === 'pass' ? passChip(v === null ? '' : String(v)) : fmt === 'b' ? `<b>${v ?? '–'}</b>` : esc(v ?? '–'); };
+  const rocell = (sheet, r, c, fmt) => `<td class="ro" data-ro="${esc(sheet)}|${r}|${c}|${fmt || ''}">${roHtml(sheet, r, c, fmt)}</td>`;
+  const gridWrap = (kind, head, body) => `<div class="tw"><table class="t sheet" data-grid="${kind}"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+  function updateRo(scope) {
+    $$('[data-ro]', scope).forEach(td => { const [s, r, c, f] = td.dataset.ro.split('|'); td.innerHTML = roHtml(s, +r, +c, f); });
+  }
+  const gridAt = (tbl, gr, gc) => $(`input.gc[data-gr="${gr}"][data-gc="${gc}"]`, tbl);
+  function gridMove(el, dr, dc) {
+    const nx = gridAt(el.closest('table'), +el.dataset.gr + dr, +el.dataset.gc + dc);
+    if (nx) { nx.focus(); nx.select(); nx.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+    return !!nx;
+  }
+  // แปลงค่าที่พิมพ์/วาง ตามชนิดช่อง (undefined = ไม่ถูกต้อง)
+  const normSex = (x) => /^(ช|ชาย|ด\.?ช\.?|เด็กชาย|m|male)$/i.test(x) ? 'ชาย' : /^(ญ|หญิง|ด\.?ญ\.?|เด็กหญิง|f|female)$/i.test(x) ? 'หญิง' : x === '' ? null : undefined;
+  const normPass = (x) => /^(ผ่าน|ผ|✓|✔|1|\/|p|pass)$/i.test(x) ? 'ผ่าน' : /^(ไม่ผ่าน|มผ|✗|✘|0|x|f|fail)$/i.test(x) ? 'ไม่ผ่าน' : x === '' || x === '-' ? null : undefined;
+  const guessSex = (name) => /^(เด็กชาย|ด\.ช\.|ดช\.?|นาย)/.test(name) ? 'ชาย' : /^(เด็กหญิง|ด\.ญ\.|ดญ\.?|นางสาว|นาง)/.test(name) ? 'หญิง' : null;
+  function convert(kind, x) {
+    x = String(x ?? '').trim();
+    if (kind === 'n') return toNum(x);
+    if (kind === 'sex') return normSex(x);
+    if (kind === 'pass') return normPass(x);
+    return x === '' ? null : x;
+  }
+  // หลังแก้ชื่อนักเรียน: เดาเพศจากคำนำหน้า และตั้งนักเรียนที่เลือกในรายงานถ้ายังไม่มี
+  function afterStudentNames(rows) {
+    for (const r of rows) { const nm = txt(L.stu, r, 2); if (nm && !txt(L.stu, r, 3)) { const g = guessSex(nm); if (g) setv(L.stu, r, 3, g); } }
+    const first = students()[0]; if (first && !currentStudent()) WB().setValue(L.sum, { r: 3, c: 2 }, first.name);
+  }
+
   // ---------------------------------------------------------------- วางข้อมูลจาก Excel / Google Sheets
   // ข้อความที่คัดลอกจากตาราง: แถวคั่นด้วยขึ้นบรรทัด คอลัมน์คั่นด้วย Tab
-  const parseGrid = (s) => String(s || '').replace(/\r/g, '').replace(/\n+$/, '').split('\n').map(l => l.split('\t').map(x => x.trim()));
-  const normName = (s) => String(s).replace(/^\d+[.)\s]+/, '').replace(/^(เด็กชาย|เด็กหญิง|ด\.ช\.|ด\.ญ\.|ดช\.?|ดญ\.?|นาย|นางสาว)\s*/, '').replace(/\s+/g, '');
-  // จับคู่แถวที่วางกับนักเรียน: ถ้าคอลัมน์แรกเป็นชื่อ จับคู่ตามชื่อ ไม่เช่นนั้นเรียงตามลำดับรายชื่อ
-  function matchRows(grid, stu) {
-    grid = grid.filter(r => r.some(x => x !== ''));
-    const byName = grid.length && grid.every(r => r[0] === '' || isNaN(Number(r[0])));
-    if (!byName) return { pairs: grid.map((cells, i) => ({ st: stu[i], cells })).filter(p => p.st), miss: Math.max(0, grid.length - stu.length), byName };
-    const idx = new Map(stu.map(st => [normName(st.name), st]));
-    const pairs = [], missNames = [];
-    for (const r of grid) { const st = idx.get(normName(r[0])); if (st) pairs.push({ st, cells: r.slice(1) }); else missNames.push(r[0]); }
-    return { pairs, miss: missNames.length, missNames, byName };
-  }
-  const toNum = (x) => { if (x === '' || x === '-' || x === '–') return null; const n = Number(String(x).replace(/,/g, '')); return isFinite(n) ? n : undefined; };
+  const parseGrid = (s) => String(s || '').replace(/\r/g, '').replace(/\n+$/, '').split('\n').map(l => l.split('\t'));
+  const toNum = (x) => { if (x === '' || x === '-' || x === '–') return null; const n = Number(String(x).replace(/,/g, '').replace(/%$/, '')); return isFinite(n) ? n : undefined; };
   // เขียนค่าลงหลายช่อง คืนจำนวนที่สำเร็จ/ไม่ผ่านเงื่อนไข (ไม่แสดงข้อความเตือนทีละช่อง)
   function writeMany(list) {
     let ok = 0, bad = 0;
     A().batch(() => { for (const [s, r, c, v] of list) { if (v === undefined) { bad++; continue; } if (A().validate(s, r, c, v)) { bad++; continue; } if (setv(s, r, c, v)) ok++; else bad++; } });
     return { ok, bad };
   }
-  function pasteReport(res, miss, missNames) {
+  // วางตารางลงช่องใดก็ได้ในตาราง: เริ่มที่ช่องที่เลือก กระจายลงล่างและไปทางขวา เหมือน Excel
+  function onPaste(e) {
+    const el = e.target; if (!el.matches || !el.matches('input.gc')) return;
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    if (!/[\t\n]/.test(text.replace(/\n+$/, ''))) return;   // ค่าเดียว: วางตามปกติ แล้วบันทึกเมื่อออกจากช่อง
+    e.preventDefault();
+    const tbl = el.closest('table'), gr0 = +el.dataset.gr, gc0 = +el.dataset.gc, list = [], stuRows = [];
+    let outside = 0;
+    parseGrid(text).forEach((cells, i) => cells.forEach((x, j) => {
+      const t = gridAt(tbl, gr0 + i, gc0 + j);
+      if (!t || t.disabled) { if (String(x).trim() !== '') outside++; return; }
+      const s = t.dataset.s, r = +t.dataset.r, c = +t.dataset.c;
+      let v = convert(t.dataset.t, x);
+      if (typeof v === 'number' && t.dataset.lo !== undefined && (v < +t.dataset.lo || v > +t.dataset.hi)) v = undefined;
+      list.push([s, r, c, v]);
+      if (s === L.stu && c === 2) stuRows.push(r);
+    }));
+    const res = writeMany(list);
+    if (stuRows.length) A().batch(() => afterStudentNames(stuRows));
     let msg = `วางข้อมูลแล้ว ${res.ok} ช่อง`;
     if (res.bad) msg += ` · ข้าม ${res.bad} ช่อง (ค่าไม่ถูกต้องหรือเกินคะแนนเต็ม)`;
-    if (miss) msg += ` · ไม่พบนักเรียน ${miss} แถว` + (missNames && missNames.length ? ` (${missNames.slice(0, 3).join(', ')}${missNames.length > 3 ? '…' : ''})` : '');
-    A().toast(msg, res.bad || miss ? 'warn' : 'ok');
+    if (outside) msg += ` · ${outside} ค่าเกินขอบตาราง`;
+    A().toast(msg, res.bad || outside ? 'warn' : 'ok');
+    const kind = tbl.dataset.grid; refresh();
+    const back = gridAt($(`table[data-grid="${kind}"]`), gr0, gc0); if (back) back.focus();
   }
-  // วางตารางลงช่องคะแนนโดยตรง: เริ่มที่ช่องที่เลือก กระจายลงนักเรียนคนถัดไป และไปทางขวาตามช่องในแถว
-  function onPaste(e) {
-    const el = e.target; if (!el.matches || !el.matches('#srows input[data-col]')) return;
-    const text = (e.clipboardData || window.clipboardData).getData('text');
-    if (!/[\t\n]/.test(text.replace(/\n+$/, ''))) return;   // ค่าเดียว: วางตามปกติ
+  function onKey(e) {
+    const el = e.target; if (!el.matches || !el.matches('input.gc')) return;
+    const atStart = el.selectionStart === 0 && el.selectionEnd === 0, atEnd = el.selectionStart === el.value.length && el.selectionEnd === el.value.length;
+    const all = el.selectionStart === 0 && el.selectionEnd === el.value.length;
+    let mv = null;
+    if (e.key === 'Enter') mv = [e.shiftKey ? -1 : 1, 0];
+    else if (e.key === 'ArrowDown') mv = [1, 0];
+    else if (e.key === 'ArrowUp') mv = [-1, 0];
+    else if (e.key === 'ArrowRight' && (atEnd || all)) mv = [0, 1];
+    else if (e.key === 'ArrowLeft' && (atStart || all)) mv = [0, -1];
+    else if (e.key === ' ' && el.dataset.t === 'pass') { e.preventDefault(); const v = el.value; el.value = v === '' ? 'ผ่าน' : v === 'ผ่าน' ? 'ไม่ผ่าน' : ''; el.dispatchEvent(new Event('change', { bubbles: true })); return; }
+    if (!mv) return;
     e.preventDefault();
-    const grid = parseGrid(text), rows = $$('#srows .srow');
-    const r0 = rows.indexOf(el.closest('.srow'));
-    const cols = $$('input[data-col]', rows[r0]).filter(i => !i.disabled).map(i => +i.dataset.col);
-    const c0 = cols.indexOf(+el.dataset.col), sc = el.dataset.s, list = [];
-    grid.forEach((cells, i) => {
-      const row = rows[r0 + i]; if (!row) return;
-      cells.forEach((x, j) => { const c = cols[c0 + j]; if (c !== undefined) list.push([sc, stuScoreRow(+row.dataset.row), c, toNum(x)]); });
-    });
-    const res = writeMany(list);
-    pasteReport(res, Math.max(0, r0 + grid.length - rows.length));
-    refresh();
-  }
-  async function pasteScores() {
-    const sc = L.score(curSubject().slot), T = U.scoreTerm, inds = activeInds(sc, T), stu = students();
-    const heads = [...inds.map((c, i) => 'ตัวชี้วัด ' + (i + 1)), 'สอบ'];
-    const v = await uiModal({
-      title: `วางคะแนน เทอม ${T}`,
-      body: `<p class="hint">คัดลอกตารางคะแนนจาก Excel / Google Sheets มาวาง 1 แถวต่อนักเรียน 1 คน<br>ลำดับคอลัมน์: <b>${['(ชื่อ-สกุล)', ...heads].join(' [Tab] ')}</b><br>
-        • มีคอลัมน์ชื่อ → จับคู่ตามชื่อ · ไม่มีชื่อ → เรียงตามลำดับรายชื่อ (${stu.length} คน) · ไม่ต้องใส่คอลัมน์เลขที่<br>• ช่องว่าง = ล้างคะแนนช่องนั้น · ถ้าต้องการเพิ่ม/ลดตัวชี้วัด ให้ทำก่อนวาง</p>
-        <textarea id="pasteBox" placeholder="${esc(['เด็กชายสมชาย ใจดี', ...heads.map((_, i) => String(8 + i))].join('\t'))}"></textarea>`,
-      ok: 'วางคะแนน', read: (r) => $('#pasteBox', r).value,
-    });
-    if (v === null || !String(v).trim()) return;
-    const m = matchRows(parseGrid(v), stu), cols = [...inds, SC[T].exam], list = [];
-    for (const { st, cells } of m.pairs) cells.slice(0, cols.length).forEach((x, j) => list.push([sc, stuScoreRow(st.r), cols[j], toNum(x)]));
-    pasteReport(writeMany(list), m.miss, m.missNames);
-    refresh();
-  }
-  async function pasteAssess() {
-    const sheet = assessSheet(), stu = students(), c1 = U.kind === 'trait' ? 10 : 5;
-    const heads = []; for (let c = 3; c <= c1; c++) heads.push(oneLine(txt(sheet, 3, c)));
-    const v = await uiModal({
-      title: 'วางผลประเมินจาก Excel',
-      body: `<p class="hint">1 แถวต่อนักเรียน 1 คน ลำดับคอลัมน์: <b>(ชื่อ-สกุล) [Tab] ${heads.map((h, i) => (i + 1) + '. ' + esc(h)).join(' [Tab] ')}</b><br>
-        ค่าที่รับ: <b>ผ่าน</b> (หรือ ✓ / 1 / /) · <b>ไม่ผ่าน</b> (หรือ ✗ / 0 / x) · ว่าง = ล้าง</p><textarea id="pasteBox"></textarea>`,
-      ok: 'วางผล', read: (r) => $('#pasteBox', r).value,
-    });
-    if (v === null || !String(v).trim()) return;
-    const conv = (x) => /^(ผ่าน|ผ|✓|✔|1|\/|p|pass)$/i.test(x) ? 'ผ่าน' : /^(ไม่ผ่าน|มผ|✗|✘|0|x|f|fail)$/i.test(x) ? 'ไม่ผ่าน' : x === '' || x === '-' ? null : undefined;
-    const m = matchRows(parseGrid(v), stu), list = [];
-    for (const { st, cells } of m.pairs) cells.slice(0, c1 - 2).forEach((x, j) => list.push([sheet, stuTraitRow(st.r), 3 + j, conv(x)]));
-    pasteReport(writeMany(list), m.miss, m.missNames);
-    refresh();
+    if (el.value !== (el.dataset.old || '')) el.dispatchEvent(new Event('change', { bubbles: true }));
+    gridMove(el, mv[0], mv[1]);
   }
 
   // เพิ่ม/ลดตัวชี้วัดของเทอมที่เลือก (ตั้ง/ล้างคะแนนเต็มในแถว 4 ของชีทคะแนน)
@@ -501,25 +469,6 @@
     A().batch(() => { for (const st of stu) setv(sc, stuScoreRow(st.r), c, null); setv(sc, 4, c, null); });
     refresh();
   }
-  function updateScoreRow(row) {
-    if (!row || !row.dataset.sc) return;
-    const sc = row.dataset.sc, r = stuScoreRow(+row.dataset.row), tc = +row.dataset.tc, lc = +row.dataset.lc;
-    const tot = num(sc, r, tc); $('[data-role=tot]', row).textContent = tot ?? '–';
-    $('[data-role=keep]', row).textContent = num(sc, r, +row.dataset.kc) ?? '–';
-    $('.tot .hint', row).textContent = ' / ' + (num(sc, 4, tc) ?? '');
-    $('[data-role=lvl]', row).innerHTML = lvChip(txt(sc, r, lc));
-    const need = new Set(scInputs(sc, tc === SC[1].tot ? 1 : 2));
-    const f = $('#fillcnt'); if (f) f.textContent = $$('#srows input[data-col]').filter(i => i.value !== '' && need.has(+i.dataset.col)).length;
-  }
-  function onKey(e) {
-    if (e.key !== 'Enter') return;
-    const el = e.target; if (!el.matches('input[data-col]')) return;
-    e.preventDefault(); el.blur();
-    const all = $$(`#srows input[data-col="${el.dataset.col}"]`); const nxt = all[all.indexOf(el) + 1];
-    if (nxt) { nxt.focus(); nxt.select && nxt.select(); }
-  }
-
-  // ---------------------------------------------------------------- ประเมิน
   function vAssess() {
     const stu = students();
     if (!stu.length) return `<div class="card empty"><b>ยังไม่มีนักเรียน</b><br><button class="btn primary" data-act="goto" data-to="data:students">ไปเพิ่มนักเรียน</button></div>`;
@@ -527,33 +476,18 @@
     const sheet = kind === 'trait' ? L.trait(t) : L.act(t);
     const c0 = 3, c1 = kind === 'trait' ? 10 : 5, kc = c1 + 1;
     const heads = []; for (let c = c0; c <= c1; c++) heads.push(c);
-    const head = `<tr><th class="stk">ชื่อ - สกุล</th>${heads.map(c => `<th data-act="acol" data-c="${c}" title="แตะเพื่อตั้งทั้งห้องเป็น ผ่าน">${esc(oneLine(txt(sheet, 3, c)))}</th>`).join('')}<th style="min-width:70px;cursor:default">สรุป</th></tr>`;
-    const body = stu.map(st => {
+    const head = `<tr><th class="no">ที่</th><th class="stk">ชื่อ - สกุล</th>${heads.map(c => `<th data-act="acol" data-c="${c}" title="แตะเพื่อตั้งทั้งห้องเป็น ผ่าน">${esc(oneLine(txt(sheet, 3, c)))}</th>`).join('')}<th class="ro" style="min-width:70px;cursor:default">สรุป</th></tr>`;
+    const body = stu.map((st, i) => {
       const r = stuTraitRow(st.r);
-      return `<tr data-row="${st.r}"><td class="stk">${esc(st.no)}. ${esc(st.name)}</td>${heads.map(c => cellBtn(sheet, r, c)).join('')}<td data-role="sum">${passChip(txt(sheet, r, kc))}</td></tr>`;
+      return `<tr><td class="no">${esc(st.no)}</td><td class="stk">${esc(st.name)}</td>${heads.map((c, j) => gcell(sheet, r, c, 'pass', i, j)).join('')}${rocell(sheet, r, kc, 'pass')}</tr>`;
     }).join('');
     return `<div class="bar">${seg([['trait', 'คุณลักษณะอันพึงประสงค์'], ['act', 'กิจกรรมพัฒนาผู้เรียน']], kind, 'akind')}${seg([[1, 'เทอม 1'], [2, 'เทอม 2']], t, 'aterm')}</div>
-      <p class="sub">แตะช่องเพื่อสลับ ว่าง → ผ่าน → ไม่ผ่าน · แตะหัวคอลัมน์เพื่อตั้งทั้งห้องเป็น “ผ่าน”</p>
-      <div class="bar"><button class="btn" data-act="aall" data-v="ผ่าน">ตั้งทั้งหมดเป็น “ผ่าน”</button><button class="btn danger" data-act="aall" data-v="">ล้างทั้งหมด</button><button class="btn" data-act="as-paste">📋 วางผลจาก Excel</button></div>
-      <div class="tw"><table class="t"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+      <p class="sub">ใช้งานเหมือนชีท Excel: พิมพ์ <b>ผ่าน</b> / <b>ไม่ผ่าน</b> (หรือ 1 / 0, ✓ / ✗) · Space สลับค่า · ดับเบิลคลิกเพื่อสลับ · วางหลายช่องจาก Excel ได้ · แตะหัวคอลัมน์เพื่อตั้งทั้งห้องเป็น “ผ่าน”</p>
+      <div class="bar"><button class="btn" data-act="aall" data-v="ผ่าน">ตั้งทั้งหมดเป็น “ผ่าน”</button><button class="btn danger" data-act="aall" data-v="">ล้างทั้งหมด</button></div>
+      ${gridWrap('assess', head, body)}`;
   }
   const passChip = (v) => v ? `<span class="pass ${v === 'ผ่าน' ? 'ok' : 'no'}">${esc(v)}</span>` : '<span class="hint">–</span>';
-  function cellBtn(sheet, r, c) {
-    const v = txt(sheet, r, c);
-    return `<td><button class="pc ${v === 'ผ่าน' ? 'ok' : v === 'ไม่ผ่าน' ? 'no' : ''}" data-act="pc" data-r="${r}" data-c="${c}">${v === 'ผ่าน' ? '✓ ผ่าน' : v === 'ไม่ผ่าน' ? '✗ ไม่ผ่าน' : '·'}</button></td>`;
-  }
   function assessSheet() { return U.kind === 'trait' ? L.trait(U.aTerm) : L.act(U.aTerm); }
-  function toggleAssess(btn) {
-    const sheet = assessSheet(), r = +btn.dataset.r, c = +btn.dataset.c;
-    const cur = txt(sheet, r, c); const nx = cur === '' ? 'ผ่าน' : cur === 'ผ่าน' ? 'ไม่ผ่าน' : null;
-    if (!setv(sheet, r, c, nx)) return;
-    refreshAssessRow(btn.closest('tr'), sheet);
-  }
-  function refreshAssessRow(tr, sheet) {
-    const r = stuTraitRow(+tr.dataset.row); const kc = (U.kind === 'trait' ? 10 : 5) + 1;
-    $$('button.pc', tr).forEach(b => { const td = b.closest('td'); td.innerHTML = cellBtn(sheet, r, +b.dataset.c).replace(/^<td>|<\/td>$/g, ''); });
-    $('[data-role=sum]', tr).innerHTML = passChip(txt(sheet, r, kc));
-  }
   function setAssessAll(v, col) {
     const sheet = assessSheet(); const c1 = U.kind === 'trait' ? 10 : 5;
     A().batch(() => { for (const st of students()) for (let c = col || 3; c <= (col || c1); c++) setv(sheet, stuTraitRow(st.r), c, v === '' ? null : v); });
@@ -652,8 +586,6 @@
       case 'dsub': U.sub.data = b.dataset.k; refresh(); break;
       case 'logo': A().pickLogo(); break;
       case 'logo-del': A().removeLogo(); break;
-      case 'stu-add': addStudent(); break;
-      case 'stu-paste': pasteStudents(); break;
       case 'stu-del': delStudent(+b.dataset.r); break;
       case 'sex': { const r = +b.dataset.r; const nx = txt(L.stu, r, 3) === b.dataset.v ? null : b.dataset.v; if (setv(L.stu, r, 3, nx)) refresh(); break; }
       case 'sub-add': addSubject(); break;
@@ -663,14 +595,10 @@
       case 'ind-del': indDel(); break;
       case 'sterm': U.scoreTerm = b.dataset.k === 'y' ? 'y' : +b.dataset.k; refresh(); break;
       case 'subj-step': { const subs = subjects(); const i = subs.findIndex(s => s.r === curSubject().r) + (+b.dataset.d); if (subs[i]) { U.slot = subs[i].r; refresh(); } break; }
-      case 'note': { const r = +b.dataset.r; if (U.openNote.has(r)) U.openNote.delete(r); else U.openNote.add(r); refresh(); break; }
       case 'akind': U.kind = b.dataset.k; refresh(); break;
       case 'aterm': U.aTerm = +b.dataset.k; refresh(); break;
-      case 'pc': toggleAssess(b); break;
       case 'acol': setAssessAll('ผ่าน', +b.dataset.c); break;
       case 'aall': setAssessAll(b.dataset.v); break;
-      case 'sc-paste': pasteScores(); break;
-      case 'as-paste': pasteAssess(); break;
       case 'rmode': U.repMode = b.dataset.k; refresh(); break;
       case 'rterm': U.repTerm = b.dataset.k === 'sum' ? 'sum' : +b.dataset.k; refresh(); break;
       case 'stu-step': stepStudent(+b.dataset.d); break;
@@ -697,6 +625,9 @@
       if (t === '') val = null;
       else { val = Number(t); if (!isFinite(val)) { A().toast('กรุณากรอกเป็นตัวเลข', 'warn'); revert(); return; } }
       if (val !== null && el.dataset.lo !== undefined && (val < +el.dataset.lo || val > +el.dataset.hi)) { A().toast('ต้องอยู่ระหว่าง ' + el.dataset.lo + ' ถึง ' + el.dataset.hi, 'warn'); revert(); return; }
+    } else if (el.dataset.t === 'sex' || el.dataset.t === 'pass') {
+      val = convert(el.dataset.t, raw);
+      if (val === undefined) { A().toast(el.dataset.t === 'sex' ? 'เพศ: พิมพ์ ชาย / หญิง (หรือ ช / ญ)' : 'พิมพ์ ผ่าน / ไม่ผ่าน (หรือ 1 / 0)', 'warn'); revert(); return; }
     } else val = raw.trim() === '' ? null : raw.replace(/\r/g, '').trim();
     if (el.dataset.chk === 'subname' && val !== null) {
       const dup = subjects().find(s => s.r !== r && s.name.trim() === val);
@@ -707,16 +638,17 @@
     el.classList.remove('bad');
     const wasCur = sheet === L.stu && c === 2 && el.dataset.old && el.dataset.old === currentStudent();
     if (!setv(sheet, r, c, val)) { revert(); return; }
+    if (val !== null && (el.dataset.t === 'sex' || el.dataset.t === 'pass')) el.value = val;
     el.dataset.old = el.value;
+    if (el.dataset.t === 'pass') { el.classList.toggle('ok', val === 'ผ่าน'); el.classList.toggle('no', val === 'ไม่ผ่าน'); }
     const af = el.dataset.after;
-    if (af === 'row') updateScoreRow(el.closest('.srow'));
+    if (af === 'grid') updateRo(el.closest('table'));
     else if (af === 'rerender') refresh();
     else if (af === 'maxchg') refresh();
     else if (af === 'sub') U.pendSub.delete(r);
     else if (af === 'stu') {
-      U.pendStu.delete(r);
-      if (val !== null && (wasCur || !currentStudent())) WB().setValue(L.sum, { r: 3, c: 2 }, val);
-      if (val === null) refresh();
+      if (val !== null && wasCur) WB().setValue(L.sum, { r: 3, c: 2 }, val);
+      if (val !== null) { A().batch(() => afterStudentNames([r])); const sx = gridAt(el.closest('table'), +el.dataset.gr, 1); if (sx) { sx.value = txt(L.stu, r, 3); sx.dataset.old = sx.value; } }
     }
   }
 

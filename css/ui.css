@@ -96,31 +96,8 @@ details.more>summary{cursor:pointer;color:var(--brand);font-size:.92rem;padding:
 .pick .btn{min-width:46px;min-height:46px;font-size:1.2rem}
 .maxbox{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
 .maxbox .fld{width:130px}
-.srows{display:grid;gap:8px}
-.srow{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center}
-.srow .sname{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis}
-.srow .inps{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:8px}
-.srow .inps label span{white-space:nowrap}
 .indbtn{gap:8px;align-self:flex-end}
-.srow .inps label{display:block}
-.srow .inps label span{display:block;font-size:.8rem;color:var(--muted)}
-.srow .inps label .ro{color:inherit;font-size:18px}
-.srow .inps input{width:100%;min-height:46px;font-size:18px;text-align:center;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
-.srow .inps input:focus{outline:2px solid var(--brand);background:var(--panel)}
-.srow .inps input:disabled{opacity:.6;cursor:not-allowed}
-.srow .inps input:disabled::placeholder{font-size:12px}
-.srow .tot{text-align:right;white-space:nowrap}
-.srow .tot b{font-size:1.15rem}
-.srow .res{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px}
-.srow .note{grid-column:1/-1}
-.srow.yr .inps{grid-template-columns:repeat(3,1fr)}
-.ro{display:block;text-align:center;min-height:46px;line-height:46px;border-radius:10px;background:var(--soft);font-size:18px}
 @media (min-width:760px){
-  .srow{grid-template-columns:44px minmax(140px,1fr) 90px minmax(320px,2.6fr) 120px;padding:8px 12px}
-  .srow .inps{grid-column:auto}
-  .srow .res{grid-column:auto;display:contents}
-  .srow .note{grid-column:2/-1}
-  .srow.yr{grid-template-columns:44px minmax(150px,1.2fr) minmax(300px,1.4fr) 130px}
 }
 
 /* assess table */
@@ -131,6 +108,23 @@ table.t thead th{position:sticky;top:0;z-index:2;background:var(--soft);font-wei
 table.t .stk{position:sticky;left:0;z-index:1;text-align:left;min-width:150px;max-width:180px;background:var(--panel);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:2px 0 0 var(--line)}
 table.t thead .stk{z-index:3;background:var(--soft);cursor:default}
 table.t tr.hl td{background:var(--soft)}
+/* ตารางแบบชีท (นักเรียน / คะแนน / ประเมิน) */
+table.sheet td.gtd{padding:0}
+table.sheet th.no,table.sheet td.no{min-width:40px;width:40px;max-width:40px;color:var(--muted);font-size:.85rem;cursor:default}
+table.sheet tr > .no:first-child{position:sticky;left:0;z-index:1}
+table.sheet thead tr > .no:first-child{z-index:3}
+table.sheet .stk{left:40px}
+table.sheet th small{font-weight:400;color:var(--muted)}
+table.sheet td.ro{background:var(--soft);min-width:64px}
+table.sheet th.ro{cursor:default}
+table.sheet .stk.wide{min-width:240px;max-width:none;padding:0}
+table.sheet td.wide input{min-width:180px}
+input.gc{display:block;width:100%;min-width:64px;height:38px;border:0;border-radius:0;background:transparent;text-align:center;font-size:16px;padding:0 8px;color:inherit;font-family:inherit}
+input.gc:focus{outline:2px solid var(--brand);outline-offset:-2px;background:var(--panel);position:relative;z-index:1}
+input.gc:disabled{background:var(--soft);cursor:not-allowed}
+input.gc.ok{background:var(--lv3bg);color:var(--lv3);font-weight:700}
+input.gc.no{background:#fee2e2;color:var(--err);font-weight:700}
+@media (prefers-color-scheme: dark){input.gc.no{background:#451a1a}}
 .pc{width:100%;min-width:62px;min-height:44px;border:1px solid var(--line);border-radius:9px;background:var(--bg);cursor:pointer;font-size:.95rem}
 .pc.ok{background:var(--lv3bg);color:var(--lv3);border-color:transparent;font-weight:700}
 .pc.no{background:#fee2e2;color:var(--err);border-color:transparent;font-weight:700}
