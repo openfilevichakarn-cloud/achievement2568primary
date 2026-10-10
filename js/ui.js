@@ -328,7 +328,14 @@
         <div class="fld"><span>ระดับที่คาดหวัง</span><div class="seg" role="group">${LEVELS.map(l => `<button data-act="exp" data-i="${i}" data-v="${l}" class="${exp === l ? 'on' : ''}">${l}</button>`).join('')}</div></div>
         ${br ? `<details class="more"><summary>แก้คำอธิบายพฤติกรรมแต่ละระดับ</summary><div class="grid2" style="margin-top:8px">${LEVELS.map((l, k) => field(l, inputFor(L.beh, br, 2 + k, { area: true, rows: 3 }))).join('')}</div></details>` : ''}
       </div>`;
-    }).join('') + `<div class="card soft"><div class="row"><button class="btn primary" data-act="ab-add"${n >= AB_MAX ? ' disabled' : ''}>＋ เพิ่มความสามารถ</button><button class="btn danger" data-act="ab-del"${n <= 1 ? ' disabled' : ''}>－ ลดความสามารถ (ข้อสุดท้าย)</button><span class="hint">ใช้ ${n} / ${AB_MAX} ข้อ</span></div></div>`;
+    }).join('') + stageExpCard() + `<div class="card soft"><div class="row"><button class="btn primary" data-act="ab-add"${n >= AB_MAX ? ' disabled' : ''}>＋ เพิ่มความสามารถ</button><button class="btn danger" data-act="ab-del"${n <= 1 ? ' disabled' : ''}>－ ลดความสามารถ (ข้อสุดท้าย)</button><span class="hint">ใช้ ${n} / ${AB_MAX} ข้อ</span></div></div>`;
+  }
+  // ป.3 / ป.6: ระดับที่คาดหวังของหน้าสรุปประถมตอนต้น/ตอนปลาย (ผลที่ได้และพัฒนาการคำนวณอัตโนมัติ)
+  function stageExpCard() {
+    if (!L.stage) return '';
+    const rows = readStage();
+    return `<div class="card"><h3>ระดับที่คาดหวัง — ${esc(L.stageLabel)}</h3><p class="hint">ใช้ในหน้า “${esc(L.stage)}” ระดับที่ได้คำนวณจากคะแนนทั้งปีอัตโนมัติ และเทียบกับระดับที่คาดหวังเป็นพัฒนาการ</p>
+      ${rows.map(a => `<div class="stexp"><div><b>${a.i + 1}.</b> ${a.group ? `<span class="hint">${esc(oneLine(a.group))} · </span>` : ''}${esc(oneLine(a.text).split(' ผู้เรียน')[0])}</div>${expSeg(a)}</div>`).join('')}</div>`;
   }
   // แก้ชื่อความสามารถ: วิชาที่ผูกกับชื่อเดิมย้ายตามชื่อใหม่
   function renameAbility(oldName, newName) {
@@ -623,21 +630,30 @@
       if (/^กิจกรรมพัฒนาผู้เรียน|^คุณลักษณะ/.test(a)) break;
       if (!a && !b) continue;
       if (a && b) group = a; else if (a) group = '';
-      out.push({ i, group, text: b || a, exp: txt(sh, r, 4), got: scored ? txt(sh, r, 7) : '', desc: beh ? txt(beh, 3 + i, 3) : '' });
+      const exp = txt(sh, r, 4), got = scored ? txt(sh, r, 7) : '';
+      out.push({ i, r, group, text: b || a, exp, got, dev: stageDev(exp, got), desc: beh ? txt(beh, 3 + i, 3) : '' });
       i++;
     }
     return out;
   }
+  // เทียบระดับที่ได้กับที่คาดหวัง (คำเดียวกับคอลัมน์พัฒนาการใน ปพ.6)
+  function stageDev(exp, got) {
+    const e = lvIdx(exp), g = lvIdx(got);
+    if (e < 0 || g < 0) return '';
+    return g > e ? 'สูงกว่าเกณฑ์' : g < e ? 'เข้าใกล้เกณฑ์' : 'พอดีเกณฑ์';
+  }
+  const devChip = (d) => d ? `<span class="dev ${d === 'สูงกว่าเกณฑ์' ? 'up' : d === 'เข้าใกล้เกณฑ์' ? 'down' : ''}">${esc(d)}</span>` : '';
+  const expSeg = (a) => `<div class="seg sm" role="group" aria-label="ระดับที่คาดหวัง">${LEVELS.map(l => `<button data-act="sexp" data-r="${a.r}" data-v="${l}" class="${a.exp === l ? 'on' : ''}">${l}</button>`).join('')}</div>`;
   function stageCards(rows) {
     return rows.map(a => `<div class="card abil"><header><div class="n">${a.i + 1}</div><div class="tx">${a.group ? `<div class="hint">${esc(oneLine(a.group))}</div>` : ''}<div>${esc(oneLine(a.text))}</div>
-      <div class="lv"><span>คาดหวัง ${lvChip(a.exp)}</span><span>ได้ ${lvChip(a.got)}</span></div></div></header>${a.desc && a.got ? `<div class="desc">${esc(a.desc)}</div>` : ''}</div>`).join('');
+      <div class="lv"><span>คาดหวัง</span>${expSeg(a)}<span>ได้ ${lvChip(a.got)}</span>${devChip(a.dev)}</div></div></header>${a.desc && a.got ? `<div class="desc">${esc(a.desc)}</div>` : ''}</div>`).join('');
   }
   function vClassStage(stu, keep) {
     const data = stu.map(st => { WB().setValue(L.sum, { r: 3, c: 2 }, st.name); return { st, rows: readStage() }; });
     WB().setValue(L.sum, { r: 3, c: 2 }, keep);
     const heads = (data[0] ? data[0].rows : readStage()).map(a => oneLine(a.text.split('\n')[0]));
     const head = `<tr><th class="stk">ชื่อ - สกุล</th>${heads.map(h => `<th style="cursor:default" title="${esc(h)}">${esc(h.length > 28 ? h.slice(0, 28) + '…' : h)}</th>`).join('')}</tr>`;
-    const rows = data.map(d => `<tr data-act="open-stu" data-name="${esc(d.st.name)}" style="cursor:pointer"><td class="stk">${esc(d.st.no)}. ${esc(d.st.name)}</td>${d.rows.map(a => `<td>${lvChip(a.got)}</td>`).join('')}</tr>`).join('');
+    const rows = data.map(d => `<tr data-act="open-stu" data-name="${esc(d.st.name)}" style="cursor:pointer"><td class="stk">${esc(d.st.no)}. ${esc(d.st.name)}</td>${d.rows.map(a => `<td>${lvChip(a.got)}${a.dev ? `<div class="hint" style="font-size:.75rem">${esc(a.dev)}</div>` : ''}</td>`).join('')}</tr>`).join('');
     return `<div class="card"><h3>${esc(L.stageLabel)} — ทั้งห้อง</h3><p class="hint">ผลสรุปจากคะแนนทั้งปีของชั้นนี้ (ตามสูตรในไฟล์ต้นฉบับ)</p></div><div class="tw"><table class="t"><thead>${head}</thead><tbody>${rows}</tbody></table></div><p class="hint">แตะชื่อนักเรียนเพื่อดูรายคน</p>
       <div class="card" style="margin-top:12px"><div class="row"><button class="btn primary" data-act="print-all">พิมพ์${esc(L.stageLabel)} ทั้งห้อง</button></div></div>`;
   }
@@ -714,6 +730,7 @@
       case 'sub-add': addSubject(); break;
       case 'sub-del': delSubject(+b.dataset.r); break;
       case 'exp': setExpected(+b.dataset.i, b.dataset.v); break;
+      case 'sexp': setv(L.stage, +b.dataset.r, 4, b.dataset.v); refresh(); break;
       case 'ind-add': indAdd(); break;
       case 'ab-add': abAdd(); break;
       case 'ab-del': abDel(); break;

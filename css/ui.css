@@ -225,3 +225,8 @@ input.gc.no{background:#fee2e2;color:var(--err);font-weight:700}
 .p5row{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)}
 .p5row:first-of-type{border-top:0}
 .tabbar button{line-height:1.15;text-align:center}
+
+/* ระดับที่คาดหวังของหน้าสรุปประถมตอนต้น/ตอนปลาย */
+.seg.sm button{min-height:30px;padding:.2rem .6rem;font-size:.85rem}
+.stexp{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--line)}
+.stexp:first-of-type{border-top:0}
