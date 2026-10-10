@@ -55,3 +55,11 @@ for s in d['sheets']:
         if r <= 3: c['s'] = no_border(c['s'])
         elif r == 4 and colnum(m[1]) <= 33: c['s'] = top_border(c['s'])   # A-AG
 json.dump(d, open(path, 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
+
+# ชีทคะแนนรายวิชา: 'กำหนดคะแนนเต็ม (ปรับได้ตามวิชา)' -> 'กำหนดคะแนนเต็ม'
+d = json.load(open(path, encoding='utf-8'))
+for s in d['sheets']:
+    if not re.match(r'^คะแนนรายวิชา \d+$', s['name']): continue
+    c = s['cells'].get('A4')
+    if c and isinstance(c.get('v'), str): c['v'] = re.sub(r'\s*\(ปรับได้ตามวิชา\)\s*', '', c['v']).strip()
+json.dump(d, open(path, 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
