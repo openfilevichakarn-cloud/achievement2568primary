@@ -56,9 +56,10 @@ for s in d['sheets']:
     if p6:
         for k, c in list(cells.items()):
             v = c.get('v'); col, r = split(k)
-            if v == '%':      # ตัวเลขการเข้าชั้นเรียนกับ % อยู่แนวกลางเดียวกัน
+            if v == '%':      # ตัวเลขการเข้าชั้นเรียน, % และข้อความทั้งแถว อยู่แนวกลางเดียวกัน
                 restyle(cells, k, v='center', h='left')
-                restyle(cells, n2col(col2n(col) - 1) + str(r), v='center')
+                for kk in [x for x in cells if split(x)[1] == r and x != k]:
+                    restyle(cells, kk, v='center')
             if v in ('กิจกรรมพัฒนาผู้เรียน', 'คุณลักษณะอันพึงประสงค์'):   # กลางซ้าย
                 restyle(cells, k, h='left', v='center')
                 restyle(cells, n2col(col2n(col) + 1) + str(r), v='center')
