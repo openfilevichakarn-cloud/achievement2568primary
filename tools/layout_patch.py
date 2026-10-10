@@ -17,6 +17,7 @@ def variant(i, **kw):
     if 'size' in kw: s['f'][0] = 'TH Sarabun New'; s['f'][1] = kw['size']
     if 'h' in kw: s['a'][0] = kw['h']
     if 'v' in kw: s['a'][1] = kw['v']
+    if 'wrap' in kw: s['a'][2] = kw['wrap']
     styles.append(s); cache[key] = len(styles) - 1
     return cache[key]
 def col2n(c):
@@ -35,7 +36,7 @@ def restyle(cells, k, **kw):
 for s in d['sheets']:
     n = s['name']
     cover = n.startswith('ปก ปพ.5')
-    p6 = bool(re.match(r'^ปพ\.6 ป\.\d+ ?(รวม|เทอม[12])$', n))
+    p6 = bool(re.match(r'^ปพ\.6 (ป\.\d+ ?(รวม|เทอม[12])|ประถมตอน(ต้น|ปลาย))$', n))   # รวมหน้าสรุปประถมตอนต้น/ตอนปลาย (ป.3/ป.6)
     if not (cover or p6): continue
     cells = s['cells']
     # 1) ฟอนต์ 16
@@ -63,6 +64,11 @@ for s in d['sheets']:
             if v in ('กิจกรรมพัฒนาผู้เรียน', 'คุณลักษณะอันพึงประสงค์'):   # กลางซ้าย
                 restyle(cells, k, h='left', v='center')
                 restyle(cells, n2col(col2n(col) + 1) + str(r), v='center')
+    if n.startswith('ปพ.6 ประถมตอน'):   # หน้าสรุปประถมตอนต้น/ปลาย: ชื่อความสามารถยาว ให้ตัดบรรทัดได้
+        for k, c in cells.items():
+            col, r = split(k)
+            if col in ('A', 'B') and 5 <= r <= 12 and isinstance(c.get('v'), str) and c['s'] is not None:
+                c['s'] = variant(c['s'], wrap=1)
     if cover:
         shapes = []
         marks = [(k, c['v']) for k, c in cells.items() if c.get('v') in ('อนุมัติ', 'ไม่อนุมัติ')]

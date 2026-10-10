@@ -78,7 +78,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ป.' + g + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261010x');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261010y');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -269,14 +269,14 @@
     const tb = $('#sheet-tools'); tb.innerHTML = '';
     const add = (label, fn, cls) => { const b = document.createElement('button'); b.className = 'btn ' + (cls || ''); b.textContent = label; b.onclick = fn; tb.appendChild(b); };
     const n = S.active, N = S.names;
-    const isRep = n === N.sum || n === N.term[1] || n === N.term[2];
+    const isRep = n === N.sum || n === N.term[1] || n === N.term[2] || (N.stage && n === N.stage);
     if (isRep) {
       const sel = document.createElement('select'); sel.className = 'docsel'; sel.setAttribute('aria-label', 'เลือกนักเรียน');
       const cur = S.wb.get(S.wb.sheet(N.sum), 3, 2);
       sel.innerHTML = M.studentList(ctx()).map(x => `<option${x === cur ? ' selected' : ''}>${esc(x)}</option>`).join('');
       sel.onchange = () => { S.wb.setValue(N.sum, { r: 3, c: 2 }, sel.value); renderSheet(); };
       tb.appendChild(sel);
-      const which = n === N.sum ? 'sum' : (n === N.term[1] ? 1 : 2);
+      const which = n === N.sum ? 'sum' : n === N.stage ? 'stage' : (n === N.term[1] ? 1 : 2);
       add('พิมพ์คนนี้', () => printOne(which), 'primary'); add('พิมพ์ทั้งห้อง', () => printAll(which));
     } else {
       add('พิมพ์', () => printSheets([n]), 'primary');

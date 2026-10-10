@@ -31,6 +31,7 @@
     const find = (re) => wb.sheets.map(s => s.name).find(n => re.test(n));
     L = {
       info: N.info, subj: N.subj, sub: 'รายวิชา', stu: N.p1, sum: N.sum, sumBeh: N.sumBeh, term: N.term, termBeh: N.termBeh,
+      stage: N.stage, stageBeh: N.stageBeh, stageLabel: N.stage ? (/ต้น/.test(N.stage) ? 'สรุปประถมตอนต้น' : 'สรุปประถมตอนปลาย') : null,
       beh: 'ค่าพฤติกรรม', cover1: find(/^ปก ปพ\.5 รายชั้น.*เทอม1$/),
       trait: (t) => find(new RegExp('^คุณลักษณะ.*เทอม' + t + '$')),
       act: (t) => find(new RegExp('^กิจกรรมพัฒนาผู้เรียน.*เทอม' + t + '$')),
@@ -573,7 +574,7 @@
     const stu = students();
     if (!stu.length) return `<div class="card empty"><b>ยังไม่มีนักเรียน</b><br><button class="btn primary" data-act="goto" data-to="data:students">ไปเพิ่มนักเรียน</button></div>`;
     const W = U.repTerm;
-    const top = `<div class="bar">${seg([['one', 'รายคน'], ['all', 'ทั้งห้อง']], U.repMode, 'rmode')}${seg([['sum', 'ทั้งปี'], [1, 'เทอม 1'], [2, 'เทอม 2']], W, 'rterm')}</div>`;
+    const top = `<div class="bar">${seg([['one', 'รายคน'], ['all', 'ทั้งห้อง']], U.repMode, 'rmode')}${seg([['sum', 'ทั้งปี'], [1, 'เทอม 1'], [2, 'เทอม 2'], ...(L.stage ? [['stage', L.stageLabel]] : [])], W, 'rterm')}</div>`;
     return top + (U.repMode === 'all' ? vClass() : vOne());
   }
   function vOne() {
@@ -581,9 +582,9 @@
     let curName = currentStudent(); let st = stu.find(s => s.name === curName);
     if (!st) { st = stu[0]; WB().setValue(L.sum, { r: 3, c: 2 }, st.name); }
     const idx = stu.indexOf(st);
-    const abs = readReport(W); const ps = passFor(st, W);
-    const sheetName = W === 'sum' ? L.sum : L.term[W];
-    const cards = abs.map(a => `<div class="card abil"><header><div class="n">${a.i + 1}</div><div class="tx"><div>${esc(oneLine(a.text))}</div>
+    const abs = W === 'stage' ? readStage() : readReport(W); const ps = passFor(st, W === 'stage' ? 'sum' : W);
+    const sheetName = W === 'stage' ? L.stage : W === 'sum' ? L.sum : L.term[W];
+    const cards = W === 'stage' ? stageCards(abs) : abs.map(a => `<div class="card abil"><header><div class="n">${a.i + 1}</div><div class="tx"><div>${esc(oneLine(a.text))}</div>
         <div class="lv"><span>คาดหวัง ${lvChip(a.exp)}</span><span>ได้ ${lvChip(a.got)}</span>${a.dev ? `<span class="dev ${a.dev === 'สูงกว่าเกณฑ์' ? 'up' : a.dev === 'เข้าใกล้เกณฑ์' ? 'down' : ''}">${esc(a.dev)}</span>` : ''}</div></div></header>
         ${a.subs.length ? `<div class="subs">${a.subs.map(s => { const pc = s.max ? Math.min(100, Math.round((s.got || 0) / s.max * 100)) : 0; return `<div class="sline"><span class="nm">${esc(oneLine(s.name))}</span><span><b>${s.got ?? '–'}</b> / ${s.max ?? ''}</span><div class="meter"><i style="width:${s.got === null ? 0 : pc}%"></i></div></div>`; }).join('')}</div>` : ''}
         ${a.desc && a.got ? `<div class="desc">${esc(a.desc)}</div>` : ''}</div>`).join('');
@@ -593,7 +594,7 @@
       <div class="rhead" style="margin-top:12px"><div><h3>${esc(st.name)}</h3><span class="hint">เลขที่ ${esc(st.no)} · ${esc(st.sex || '–')} · เข้าเรียน ${st.att ?? '–'}%</span></div>
         <div class="row"><span>กิจกรรม ${passChip2(ps.act)}</span><span>คุณลักษณะ ${passChip2(ps.trait)}</span></div></div></div>
       ${cards}
-      <div class="card"><div class="row"><button class="btn primary" data-act="print-one">พิมพ์ ปพ.6 คนนี้</button><button class="btn" data-act="print-all">พิมพ์ทั้งห้อง</button><button class="btn" data-act="open-doc" data-n="${esc(sheetName)}">ดูแบบฟอร์มทางการ</button></div>
+      <div class="card"><div class="row"><button class="btn primary" data-act="print-one">พิมพ์${W === 'stage' ? L.stageLabel : ' ปพ.6'} คนนี้</button><button class="btn" data-act="print-all">พิมพ์ทั้งห้อง</button><button class="btn" data-act="open-doc" data-n="${esc(sheetName)}">ดูแบบฟอร์มทางการ</button></div>
       <p class="hint">การพิมพ์: เลือก “บันทึกเป็น PDF” ในหน้าต่างพิมพ์ได้ (บนมือถือใช้เมนูแชร์/พิมพ์ของเบราว์เซอร์)</p></div>`;
   }
   const passChip2 = (v) => v ? `<span class="pass ${v === 'ผ่าน' ? 'ok' : 'no'}">${esc(v)}</span>` : '<span class="pass">ยังไม่ประเมิน</span>';
@@ -603,6 +604,7 @@
   }
   function vClass() {
     const stu = students(); const W = U.repTerm; const keep = currentStudent();
+    if (W === 'stage') return vClassStage(stu, keep);
     const data = stu.map(st => { WB().setValue(L.sum, { r: 3, c: 2 }, st.name); return { st, abs: readReport(W).map(a => a.got) }; });
     WB().setValue(L.sum, { r: 3, c: 2 }, keep);
     const dist = L.ab.map((r, i) => { const c = [0, 0, 0, 0]; let n = 0; for (const d of data) { const k = lvIdx(d.abs[i]); if (k >= 0) { c[k]++; n++; } } return { c, n }; });
@@ -611,6 +613,33 @@
     const rows = data.map(d => `<tr data-act="open-stu" data-name="${esc(d.st.name)}" style="cursor:pointer"><td class="stk">${esc(d.st.no)}. ${esc(d.st.name)}</td>${d.abs.map(g => `<td>${lvChip(g)}</td>`).join('')}</tr>`).join('');
     return `${sumBar}<div class="tw"><table class="t"><thead>${head}</thead><tbody>${rows}</tbody></table></div><p class="hint">แตะชื่อนักเรียนเพื่อดูรายงานรายคน</p>
       <div class="card" style="margin-top:12px"><div class="row"><button class="btn primary" data-act="print-all">พิมพ์ ปพ.6 ทั้งห้อง</button></div></div>`;
+  }
+  // หน้าสรุปประถมตอนต้น (ป.3) / ตอนปลาย (ป.6): แถวความสามารถตั้งแต่แถว 5 จนถึงแถว 'กิจกรรมพัฒนาผู้เรียน'
+  function readStage() {
+    const sh = L.stage, beh = L.stageBeh, out = []; let group = '';
+    const scored = readReport('sum').some(a => a.got);   // ยังไม่มีคะแนนเลย = ยังไม่มีผล
+    for (let r = 5, i = 0; r <= 40; r++) {
+      const a = txt(sh, r, 1).trim(), b = txt(sh, r, 2).trim();
+      if (/^กิจกรรมพัฒนาผู้เรียน|^คุณลักษณะ/.test(a)) break;
+      if (!a && !b) continue;
+      if (a && b) group = a; else if (a) group = '';
+      out.push({ i, group, text: b || a, exp: txt(sh, r, 4), got: scored ? txt(sh, r, 7) : '', desc: beh ? txt(beh, 3 + i, 3) : '' });
+      i++;
+    }
+    return out;
+  }
+  function stageCards(rows) {
+    return rows.map(a => `<div class="card abil"><header><div class="n">${a.i + 1}</div><div class="tx">${a.group ? `<div class="hint">${esc(oneLine(a.group))}</div>` : ''}<div>${esc(oneLine(a.text))}</div>
+      <div class="lv"><span>คาดหวัง ${lvChip(a.exp)}</span><span>ได้ ${lvChip(a.got)}</span></div></div></header>${a.desc && a.got ? `<div class="desc">${esc(a.desc)}</div>` : ''}</div>`).join('');
+  }
+  function vClassStage(stu, keep) {
+    const data = stu.map(st => { WB().setValue(L.sum, { r: 3, c: 2 }, st.name); return { st, rows: readStage() }; });
+    WB().setValue(L.sum, { r: 3, c: 2 }, keep);
+    const heads = (data[0] ? data[0].rows : readStage()).map(a => oneLine(a.text.split('\n')[0]));
+    const head = `<tr><th class="stk">ชื่อ - สกุล</th>${heads.map(h => `<th style="cursor:default" title="${esc(h)}">${esc(h.length > 28 ? h.slice(0, 28) + '…' : h)}</th>`).join('')}</tr>`;
+    const rows = data.map(d => `<tr data-act="open-stu" data-name="${esc(d.st.name)}" style="cursor:pointer"><td class="stk">${esc(d.st.no)}. ${esc(d.st.name)}</td>${d.rows.map(a => `<td>${lvChip(a.got)}</td>`).join('')}</tr>`).join('');
+    return `<div class="card"><h3>${esc(L.stageLabel)} — ทั้งห้อง</h3><p class="hint">ผลสรุปจากคะแนนทั้งปีของชั้นนี้ (ตามสูตรในไฟล์ต้นฉบับ)</p></div><div class="tw"><table class="t"><thead>${head}</thead><tbody>${rows}</tbody></table></div><p class="hint">แตะชื่อนักเรียนเพื่อดูรายคน</p>
+      <div class="card" style="margin-top:12px"><div class="row"><button class="btn primary" data-act="print-all">พิมพ์${esc(L.stageLabel)} ทั้งห้อง</button></div></div>`;
   }
   function afterReport() { /* ที่ว่างสำหรับต่อยอด */ }
   const whichKey = () => U.repTerm;
@@ -664,7 +693,7 @@
     };
     const scoreNames = subs.map(s => L.score(s.slot));
     return `<h2>เอกสารรูปแบบทางการ</h2><p class="sub">ดูตัวอย่างและพิมพ์แบบฟอร์ม ปพ.5 / ปพ.6 ตามต้นฉบับ (แก้ข้อมูลที่หน้าอื่น เอกสารจะอัปเดตเอง)</p>` +
-      grp('ปพ.6 แจ้งผลการเรียน', [L.sum, L.sumBeh, L.term[1], L.termBeh[1], L.term[2], L.termBeh[2]].filter(Boolean)) +
+      grp('ปพ.6 แจ้งผลการเรียน', [L.sum, L.sumBeh, L.term[1], L.termBeh[1], L.term[2], L.termBeh[2], L.stage, L.stageBeh].filter(Boolean)) +
       grp('ปก ปพ.5', all.filter(n => /^ปก /.test(n))) +
       grp('แบบบันทึกคะแนนรายวิชา (ปพ.5)', scoreNames, (n) => { const s = subs.find(x => L.score(x.slot) === n); return s ? oneLine(s.name) : n; }) +
       grp('คุณลักษณะและกิจกรรม', all.filter(n => /^(คุณลักษณะ|กิจกรรมพัฒนาผู้เรียน)/.test(n))) +
@@ -698,7 +727,7 @@
       case 'acol': setAssessAll('ผ่าน', +b.dataset.c); break;
       case 'aall': setAssessAll(b.dataset.v); break;
       case 'rmode': U.repMode = b.dataset.k; refresh(); break;
-      case 'rterm': U.repTerm = b.dataset.k === 'sum' ? 'sum' : +b.dataset.k; refresh(); break;
+      case 'rterm': U.repTerm = ['sum', 'stage'].includes(b.dataset.k) ? b.dataset.k : +b.dataset.k; refresh(); break;
       case 'stu-step': stepStudent(+b.dataset.d); break;
       case 'open-stu': WB().setValue(L.sum, { r: 3, c: 2 }, b.dataset.name); U.repMode = 'one'; refresh(); break;
       case 'print-one': A().printOne(whichKey()); break;

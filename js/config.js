@@ -6,5 +6,5 @@ window.PP_CONFIG = {
   SUPABASE_URL: 'https://htyytgkpufyhythcbofq.supabase.co',
   SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0eXl0Z2twdWZ5aHl0aGNib2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE0NTc1NjcsImV4cCI6MjEwNzAzMzU2N30.FvV_iWfzuUdJlrMIHz-DrmZAhjS-XNzevK3bbtu2xIM',
   BUILD: '1',
-  GRADES_READY: [1, 2, 4, 5],   // ชั้นที่มีข้อมูลโปรแกรมแล้ว (data/pN.json)
+  GRADES_READY: [1, 2, 3, 4, 5, 6],   // ชั้นที่มีข้อมูลโปรแกรมแล้ว (data/pN.json)
 };

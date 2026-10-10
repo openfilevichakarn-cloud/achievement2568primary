@@ -18,6 +18,8 @@
       sum, sumBeh: find(/^ป\.\d-\d+$/),
       p1: find(/^ข้อมูลป\.\d+$/),
       term: [null, term(1), term(2)], termBeh: [null, beh(1), beh(2)],
+      // ป.3 / ป.6: หน้าสรุปประถมศึกษาตอนต้น / ตอนปลาย และหน้าคำอธิบายพฤติกรรมของหน้านั้น
+      stage: find(/^ปพ\.6 ประถมตอน/), stageBeh: find(/^ป\.\d-\d+ ประถมตอน/),
     };
   }
 
@@ -45,6 +47,22 @@
         const keep = def.merges.filter(x => !/^[AC]3[345]:/.test(x));
         view.mergeOv[nm] = keep.concat(['A33:G33', 'A34:G34', 'A35:G35']);
       } else delete view.mergeOv[nm];
+    }
+    // หน้าสรุปประถมตอนต้น/ตอนปลาย: หาแถวลายเซ็นจากสูตร (ข้อมูลพื้นฐาน!B5 ครู / B6 วิชาการ / B7 รอง ผอ.)
+    if (names.stage) {
+      const sh = wb.sheet(names.stage), def = sh.def, m = rowMap(names.stage);
+      let rT = 0, rD = 0, last = 'H';
+      for (const cell of sh.cells.values()) {
+        const f = cell.f || '';
+        if (/ข้อมูลพื้นฐาน!B5/.test(f) && cell.c === 1) rT = cell.r;
+        if (/ข้อมูลพื้นฐาน!B7/.test(f) && cell.c === 1) rD = cell.r;
+      }
+      if (rD) for (let r = rD - 1; r <= rD + 1; r++) m.set(r, noDeputy);
+      if (rT && noAcad) {
+        const rows = [rT - 1, rT, rT + 1];
+        const keep = def.merges.filter(x => { const mm = /^[A-Z]+(\d+):[A-Z]+(\d+)$/.exec(x); return !(mm && rows.includes(+mm[1])); });
+        view.mergeOv[names.stage] = keep.concat(rows.map(r => `A${r}:${last}${r}`));
+      } else delete view.mergeOv[names.stage];
     }
     // ปก ปพ.5: ซ่อนแถวลายเซ็นรอง ผอ. / หัวหน้างานวิชาการ เมื่อไม่ได้ใส่ชื่อ
     for (const sh of wb.sheets) {
@@ -147,6 +165,7 @@
   function sheetsFor(ctx, which) { // which: 'sum'|1|2
     const { names } = ctx;
     if (which === 'sum') return [names.sum, names.sumBeh];
+    if (which === 'stage') return [names.stage, names.stageBeh];
     return [names.term[which], names.termBeh[which]];
   }
 
