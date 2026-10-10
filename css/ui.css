@@ -201,3 +201,10 @@ input.gc.no{background:#fee2e2;color:var(--err);font-weight:700}
 }
 .grid2 .full{grid-column:1/-1}
 .pick select{min-width:0}.pick .btn{flex:none}
+
+/* รายงาน ปพ.5 */
+.p5grid{display:grid;grid-template-columns:1fr;gap:0 14px;align-items:start}
+@media (min-width:1100px){.p5grid{grid-template-columns:1fr 1fr}}
+.p5row{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)}
+.p5row:first-of-type{border-top:0}
+.tabbar button{line-height:1.15;text-align:center}

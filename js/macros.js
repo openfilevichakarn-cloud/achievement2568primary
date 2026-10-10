@@ -30,13 +30,30 @@
   function hideReportRows(ctx) {
     const { wb, view, names } = ctx;
     const src = wb.sheet(names.sum);
-    const deputy = wb.get(wb.sheet(names.info), 7, 2);
-    const noDeputy = String(deputy === null ? '' : deputy).trim().length === 0;
+    const blank = (r) => { const v = wb.get(wb.sheet(names.info), r, 2); return String(v === null ? '' : v).trim().length === 0; };
+    const noAcad = blank(6), noDeputy = blank(7);   // ข้อมูลพื้นฐาน B6 หัวหน้างานวิชาการ, B7 รอง ผอ.
+    const rowMap = (nm) => { let m = view.rowHidden[nm]; if (!m) { m = new Map(); view.rowHidden[nm] = m; } return m; };
+    view.mergeOv = view.mergeOv || {};
     for (const nm of [names.sum, names.term[1], names.term[2]]) {
       if (!nm) continue;
-      let m = view.rowHidden[nm]; if (!m) { m = new Map(); view.rowHidden[nm] = m; }
+      const m = rowMap(nm);
       for (let r = 6; r <= 29; r++) { const v = wb.get(src, r, 5); m.set(r, String(v === null ? '' : v).trim().length === 0); }
       for (let r = 37; r <= 39; r++) m.set(r, noDeputy);
+      // ไม่มีหัวหน้างานวิชาการ: ลายเซ็นครูประจำชั้น (A33:A35) ขยายเต็มแถว อยู่กึ่งกลางตรงกับผู้อำนวยการ
+      const def = wb.sheet(nm).def;
+      if (noAcad) {
+        const keep = def.merges.filter(x => !/^[AC]3[345]:/.test(x));
+        view.mergeOv[nm] = keep.concat(['A33:G33', 'A34:G34', 'A35:G35']);
+      } else delete view.mergeOv[nm];
+    }
+    // ปก ปพ.5: ซ่อนแถวลายเซ็นรอง ผอ. / หัวหน้างานวิชาการ เมื่อไม่ได้ใส่ชื่อ
+    for (const sh of wb.sheets) {
+      if (!/^ปก ปพ\.5/.test(sh.name)) continue;
+      const m = rowMap(sh.name);
+      for (const cell of sh.cells.values()) {
+        if (cell.v === 'รองผู้อำนวยการโรงเรียน') m.set(cell.r, noDeputy);
+        else if (cell.v === 'หัวหน้างานวิชาการโรงเรียน') m.set(cell.r, noAcad);
+      }
     }
     // หน้าคำอธิบายพฤติกรรม: ซ่อนแถวของความสามารถที่ไม่ใช้ (ชื่อว่างใน ปพ.6 รวม!I6:I13)
     for (const nm of [names.sumBeh, names.termBeh[1], names.termBeh[2]]) {
@@ -95,7 +112,7 @@
   function onChange(ctx, sheetName, r, c) {
     const { wb, names, toast } = ctx;
     // ข้อมูลพื้นฐาน!B7 -> ซ่อน/แสดงลายเซ็นรอง ผอ.
-    if (sheetName === names.info && r === 7 && c === 2) hideReportRows(ctx);
+    if (sheetName === names.info && (r === 6 || r === 7) && c === 2) hideReportRows(ctx);
     // ชื่อความสามารถ (ปพ.6 รวม!I6:I13) -> ซ่อน/แสดงแถวในหน้าคำอธิบายพฤติกรรม
     if (sheetName === names.sum && c === 9 && r >= 6 && r <= 13) hideReportRows(ctx);
     // ข้อมูลวิชา คอลัมน์ A:C

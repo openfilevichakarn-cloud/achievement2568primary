@@ -8,7 +8,7 @@
   const esc = R.esc;
   const A = () => root.PPApp;
   const LEVELS = ['เริ่มต้น', 'พัฒนา', 'ชำนาญ', 'เชี่ยวชาญ'];
-  const U = { tab: 'home', sub: { data: 'school' }, scoreTerm: 1, slot: null, kind: 'trait', aTerm: 1, repMode: 'one', repTerm: 'sum', pendSub: new Set() };
+  const U = { tab: 'home', sub: { data: 'school' }, scoreTerm: 1, slot: null, kind: 'trait', aTerm: 1, repMode: 'one', repTerm: 'sum', p5Term: 1, pendSub: new Set() };
   let L = null;
 
   // ---------------------------------------------------------------- เข้าถึงข้อมูลในเวิร์กบุ๊ก
@@ -96,8 +96,9 @@
     scores: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>',
     assess: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>',
     report: '<path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/>',
+    report5: '<path d="M5 4h6a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H5z"/><path d="M19 4h-5a3 3 0 0 0-3 3"/><path d="M19 4v14h-5"/>',
   };
-  const TABS = [['home', 'หน้าแรก'], ['data', 'ข้อมูล'], ['scores', 'คะแนน'], ['assess', 'ประเมิน'], ['report', 'รายงาน']];
+  const TABS = [['home', 'หน้าแรก'], ['data', 'ข้อมูล'], ['scores', 'คะแนน'], ['assess', 'ประเมิน'], ['report5', 'รายงาน ปพ.5'], ['report', 'รายงาน ปพ.6']];
   function renderTabbar() {
     $('#tabbar').innerHTML = TABS.map(([k, t]) => `<button data-tab="${k}" class="${U.tab === k ? 'on' : ''}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg>${t}</button>`).join('');
   }
@@ -130,7 +131,7 @@
   function refresh() { if (!L) return; const v = $('#view'); const top = v.scrollTop; renderTabbar(); render(); v.scrollTop = top; }
   function render() {
     if (L) syncAbilities();
-    const fn = { home: vHome, data: vData, scores: vScores, assess: vAssess, report: vReport, docs: vDocs }[U.tab];
+    const fn = { home: vHome, data: vData, scores: vScores, assess: vAssess, report: vReport, report5: vReport5, docs: vDocs }[U.tab];
     $('#view').innerHTML = `<div class="page">${fn()}</div>`;
     if (U.tab === 'report') afterReport();
   }
@@ -607,6 +608,45 @@
   const whichKey = () => U.repTerm;
 
   // ---------------------------------------------------------------- เอกสาร
+  // ---------------------------------------------------------------- รายงาน ปพ.5 (หน้าปก รายชั้น/รายวิชา + แบบบันทึกคะแนน + คุณลักษณะ/กิจกรรม)
+  function p5Sheets(T) {
+    const all = WB().sheets.map(s => s.name), key = T === 'sum' ? 'รวม' : 'เทอม' + T;
+    const terms = T === 'sum' ? [1, 2] : [T];
+    return {
+      cls: all.find(n => n === 'ปก ปพ.5 รายชั้น ' + key),
+      subj: all.find(n => n === 'ปก ปพ.5 รายวิชา ' + key),
+      assess: terms.flatMap(t => [L.trait(t), L.act(t)]).filter(Boolean),
+    };
+  }
+  function vReport5() {
+    const subs = subjects(), T = U.p5Term, P = p5Sheets(T);
+    if (!subs.length) return `<div class="card empty"><b>ยังไม่มีรายวิชา</b><br><button class="btn primary" data-act="goto" data-to="data:subjects">ไปเพิ่มวิชา</button></div>`;
+    const btns = (open, print) => `<span class="grow"></span><button class="btn sm" ${open}>ดู</button><button class="btn sm" ${print}>พิมพ์</button>`;
+    const row = (label, open, print) => `<div class="p5row"><span>${label}</span>${btns(open, print)}</div>`;
+    const da = (o) => Object.entries(o).map(([k, v]) => `data-${k}="${esc(v)}"`).join(' ');
+    const subRows = (kind) => subs.map((s, i) => kind === 'cover'
+      ? row(esc(oneLine(s.name)), da({ act: 'p5-open', n: P.subj, s: s.name }), da({ act: 'p5-print', set: kind, i }))
+      : row(esc(oneLine(s.name)), da({ act: 'open-doc', n: L.score(s.slot) }), da({ act: 'print-doc', n: L.score(s.slot) }))).join('');
+    return `<div class="bar">${seg([[1, 'เทอม 1'], [2, 'เทอม 2'], ['sum', 'ทั้งปี (รวม)']], T, 'p5term')}<span class="grow"></span><button class="btn primary" data-act="p5-print" data-set="all">🖨 พิมพ์ ปพ.5 ทั้งชุด</button></div>
+      <p class="sub">สมุดบันทึกการพัฒนาคุณภาพผู้เรียน (ปพ.5) — ทั้งชุด = ปกรายชั้น + ปกรายวิชาทุกวิชา + แบบบันทึกคะแนนทุกวิชา + คุณลักษณะ/กิจกรรม</p>
+      <div class="p5grid">
+      <div class="card"><h3>ปก ปพ.5 รายชั้น</h3>${row('ภาพรวมทั้งชั้น', da({ act: 'open-doc', n: P.cls }), da({ act: 'print-doc', n: P.cls }))}</div>
+      <div class="card"><h3>ปก ปพ.5 รายวิชา</h3><div class="row" style="margin-bottom:6px"><span class="hint">${subs.length} วิชา</span><span class="grow"></span><button class="btn sm" data-act="p5-print" data-set="cover">พิมพ์ทุกวิชา</button></div>${subRows('cover')}</div>
+      <div class="card"><h3>แบบบันทึกคะแนนรายวิชา</h3><div class="row" style="margin-bottom:6px"><span class="hint">ทั้งปี (เทอม 1 + เทอม 2) ในแผ่นเดียว</span><span class="grow"></span><button class="btn sm" data-act="p5-print" data-set="score">พิมพ์ทุกวิชา</button></div>${subRows('score')}</div>
+      <div class="card"><h3>คุณลักษณะ / กิจกรรมพัฒนาผู้เรียน</h3>${P.assess.map(n => row(esc(n), da({ act: 'open-doc', n }), da({ act: 'print-doc', n }))).join('')}</div>
+      </div>`;
+  }
+  function p5Print(set, i) {
+    const subs = subjects(), P = p5Sheets(U.p5Term);
+    const covers = (list) => list.map(s => ({ sheet: P.subj, subj: s.name }));
+    const scores = subs.map(s => ({ sheet: L.score(s.slot) }));
+    let items;
+    if (set === 'cover') items = i !== undefined ? covers([subs[+i]]) : covers(subs);
+    else if (set === 'score') items = scores;
+    else items = [{ sheet: P.cls }, ...covers(subs), ...scores, ...P.assess.map(n => ({ sheet: n }))];
+    A().printSet(items);
+  }
+
   function vDocs() {
     const wb = WB(); const all = wb.sheets.filter(s => !s.def.hidden).map(s => s.name);
     const subs = subjects(); const used = new Set();
@@ -657,6 +697,9 @@
       case 'print-one': A().printOne(whichKey()); break;
       case 'print-all': A().printAll(whichKey()); break;
       case 'open-doc': A().openDoc(b.dataset.n); break;
+      case 'p5term': U.p5Term = b.dataset.k === 'sum' ? 'sum' : +b.dataset.k; refresh(); break;
+      case 'p5-open': A().openCover(b.dataset.n, b.dataset.s); break;
+      case 'p5-print': p5Print(b.dataset.set, b.dataset.i); break;
       case 'print-doc': A().printSheets([b.dataset.n]); break;
       default: break;
     }

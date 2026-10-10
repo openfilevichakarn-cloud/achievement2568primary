@@ -82,7 +82,8 @@
     if (opts.area) { const a = parseRange(opts.area); if (a) { r1 = a.r1; c1 = a.c1; r2 = a.r2; c2 = a.c2; } }
     // merges
     const anchors = new Map(), covered = new Set();
-    for (const m of d.merges) {
+    const merges = (view && view.mergeOv && view.mergeOv[sheetName]) || d.merges;   // ผสานเซลล์แบบปรับตามข้อมูล (เช่น ลายเซ็น)
+    for (const m of merges) {
       const a = parseRange(m); if (!a) continue;
       anchors.set(P.KEY(a.r1, a.c1), a);
       for (let r = a.r1; r <= a.r2; r++) for (let c = a.c1; c <= a.c2; c++) if (r !== a.r1 || c !== a.c1) covered.add(P.KEY(r, c));

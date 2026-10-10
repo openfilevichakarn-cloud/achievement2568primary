@@ -73,7 +73,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ป.' + g + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261010j');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261010k');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -411,6 +411,22 @@
     refreshDoc();
   }
 
+  // พิมพ์หลายเอกสารรวดเดียว: items = [{ sheet, subj? }] (subj = วิชาที่ให้หน้าปก ปพ.5 รายวิชา แสดง)
+  const SUBJ_CELL = { r: 6, c: 18 };   // ปก ปพ.5 รายวิชา!R6
+  function setCoverSubject(sheet, subj) { S.wb.setValue(sheet, SUBJ_CELL, subj); }
+  async function printSet(items) {
+    items = items.filter(x => x && S.wb.sheet(x.sheet));
+    if (!items.length) { toast('ไม่มีเอกสารให้พิมพ์', 'warn'); return; }
+    const old = {}; const blocks = [];
+    for (const it of items) {
+      if (it.subj !== undefined) { if (!(it.sheet in old)) old[it.sheet] = S.wb.get(S.wb.sheet(it.sheet), SUBJ_CELL.r, SUBJ_CELL.c); setCoverSubject(it.sheet, it.subj); }
+      blocks.push(printBlock(it.sheet));
+    }
+    for (const [sh, v] of Object.entries(old)) setCoverSubject(sh, v);
+    await printSheets(null, blocks);
+  }
+  function openCover(sheet, subj) { if (subj !== undefined) applyValue(sheet, SUBJ_CELL.r, SUBJ_CELL.c, subj); openDoc(sheet); }
+
   // ---------------------------------------------------------------- boot
   function boot() {
     $('#login-form').addEventListener('submit', (e) => { e.preventDefault(); doLogin($('#login-code').value, $('#login-remember').checked); });
@@ -429,6 +445,6 @@
   document.addEventListener('DOMContentLoaded', boot);
   window.PPApp = {
     S, ctx, toast, modal, applyValue, validate, markDirty, save, batch, printSheets, printOne, printAll, printBlock,
-    openDoc, closeDoc, refreshDoc, pickLogo: () => $('#logo-file').click(), removeLogo, setStatus, flushSave,
+    openDoc, closeDoc, refreshDoc, printSet, openCover, pickLogo: () => $('#logo-file').click(), removeLogo, setStatus, flushSave,
   };
 })();
