@@ -73,7 +73,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ป.' + g + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261010m');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261010o');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -241,8 +241,8 @@
   function closeDoc() { $('#docviewer').hidden = true; document.body.classList.remove('docopen'); if (window.PPUI) PPUI.refresh(); }
   function refreshDoc() { if (!$('#docviewer').hidden) renderSheet(); }
 
-  function sheetHtmlFor(name, edit, area) {
-    return R.sheetHtml({ wb: S.wb, sheetName: name, view: S.view, edit, area, styles: S.styles, hasList: (s, r, c) => { const d = findDv(s, r, c); return d && d.t === 'list'; }, logo: S.view.logo, logoAt: logoAnchor });
+  function sheetHtmlFor(name, edit, area, viewOv) {
+    return R.sheetHtml({ wb: S.wb, sheetName: name, view: viewOv ? { ...S.view, ...viewOv } : S.view, edit, area, styles: S.styles, hasList: (s, r, c) => { const d = findDv(s, r, c); return d && d.t === 'list'; }, logo: S.view.logo, logoAt: logoAnchor });
   }
   function renderSheet() {
     const pa = S.wb.sheet(S.active).def.print; const area = pa && pa.area ? pa.area.replace(/^.*!/, '') : null;
@@ -250,7 +250,7 @@
     const host = $('#sheet-host'); host.innerHTML = out.html;
     const avail = Math.max(200, $('#sheet-scroll').clientWidth - 28);
     const z = S.zoom === 'fit' ? Math.min(1.6, avail / Math.max(1, out.width)) : +S.zoom;   // พอดีจอ: ขยายเกิน 100% ได้บนจอใหญ่
-    host.style.zoom = Math.max(0.2, z);
+    host.style.zoom = Math.max(0.2, z); host.style.setProperty('--bw', (1 / Math.max(0.2, z)) + 'px');
   }
 
   function logoAnchor(sheetName) {
@@ -367,7 +367,7 @@
 
   // ---------------------------------------------------------------- print
   const PAPER = { 9: [210, 297], 8: [297, 420], 1: [216, 279], 5: [216, 356], 7: [184, 267] };
-  function printBlock(sheetName) {
+  function printBlock(sheetName, viewOv, fitBoth) {
     const d = S.wb.sheet(sheetName).def; const pr = d.print;
     const [pw, ph] = PAPER[pr.paper] || PAPER[9];
     const land = pr.orient === 'landscape';
@@ -375,20 +375,38 @@
     const m = pr.m || [0.7, 0.7, 0.75, 0.75];
     const availW = W - (m[0] + m[1]) * 96, availH = H - (m[2] + m[3]) * 96;
     let area = pr.area ? pr.area.replace(/^.*!/, '') : null;
-    const out = sheetHtmlFor(sheetName, false, area);
+    const out = sheetHtmlFor(sheetName, false, area, viewOv);
     let zoom = 1;
     if (pr.fitPage) {
-      const fw = pr.fw === 0 ? 0 : (pr.fw || 1), fh = pr.fh === 0 ? 0 : (pr.fh || 1);
+      const fw = fitBoth ? 1 : pr.fw === 0 ? 0 : (pr.fw || 1), fh = fitBoth ? 1 : pr.fh === 0 ? 0 : (pr.fh || 1);
       const zw = fw ? availW * fw / out.width : Infinity, zh = fh ? availH * fh / out.height : Infinity;
       zoom = Math.min(1, zw, zh);
     } else if (pr.scale) zoom = pr.scale / 100;
     zoom = Math.max(0.2, zoom * 0.985);
-    return { html: out.html, zoom, land, m, hc: pr.hc, width: out.width * zoom };
+    // ปก ปพ.5: จัดกึ่งกลางหน้ากระดาษทั้งแนวนอนและแนวตั้ง
+    const cover = /^ปก /.test(sheetName);
+    return { html: out.html, zoom, land, m, hc: pr.hc || cover, vc: cover, width: out.width * zoom };
+  }
+  // แบบบันทึกคะแนนรายวิชา: พิมพ์ 3 หน้า (เทอม 1 / เทอม 2 / สรุปทั้งปี) โดยซ่อนคอลัมน์ที่ไม่เกี่ยวในแต่ละหน้า
+  const SCORE_PAGES = [
+    { inds: 3, cols: [13, 14, 15, 30] },          // เทอม 1: ตัวชี้วัด C-L, เก็บ, สอบ, รวม, ระดับ ท.1
+    { inds: 16, cols: [26, 27, 28, 31] },         // เทอม 2: ตัวชี้วัด P-Y, เก็บ, สอบ, รวม, ระดับ ท.2
+    { inds: 0, cols: [15, 28, 29, 32] },          // ทั้งปี: รวม ท.1, รวม ท.2, รวมทั้งปี, ระดับทั้งปี
+  ];
+  function blocksFor(sheetName) {
+    const sh = S.wb.sheet(sheetName); const n = sh && sh.def.indicator;
+    if (!n) return [printBlock(sheetName)];
+    return SCORE_PAGES.map(pg => {
+      const show = new Set([1, 2, 33, ...pg.cols]);
+      if (pg.inds) for (let c = pg.inds; c < pg.inds + n; c++) { const v = S.wb.get(sh, 4, c); if (v !== null && v !== '') show.add(c); }
+      const blk = printBlock(sheetName, { colHidden: (name, c) => name === sheetName ? !show.has(c) : undefined }, true);   // 1 หน้าต่อส่วน
+      blk.hc = true; return blk;
+    });
   }
   async function printSheets(list, preBuilt) {
-    const blocks = preBuilt || list.filter(Boolean).map(printBlock);
+    const blocks = preBuilt || list.filter(Boolean).flatMap(blocksFor);
     const root = $('#print-root');
-    root.innerHTML = blocks.map(b => `<section class="pp-page ${b.land ? 'land' : 'port'}" style="padding:${b.m[2]}in ${b.m[1]}in ${b.m[3]}in ${b.m[0]}in"><div class="pp-zoom" style="zoom:${b.zoom}${b.hc ? ';margin:0 auto;width:max-content' : ''}">${b.html}</div></section>`).join('');
+    root.innerHTML = blocks.map(b => `<section class="pp-page ${b.land ? 'land' : 'port'}${b.vc ? ' vc' : ''}" style="padding:${b.m[2]}in ${b.m[1]}in ${b.m[3]}in ${b.m[0]}in"><div class="pp-zoom" style="zoom:${b.zoom};--bw:${1 / b.zoom}px${b.hc ? ';margin:0 auto;width:max-content' : ''}">${b.html}</div></section>`).join('');
     document.body.classList.add('printing');
     await new Promise(r => setTimeout(r, 120));
     window.print();
@@ -420,7 +438,7 @@
     const old = {}; const blocks = [];
     for (const it of items) {
       if (it.subj !== undefined) { if (!(it.sheet in old)) old[it.sheet] = S.wb.get(S.wb.sheet(it.sheet), SUBJ_CELL.r, SUBJ_CELL.c); setCoverSubject(it.sheet, it.subj); }
-      blocks.push(printBlock(it.sheet));
+      blocks.push(...blocksFor(it.sheet));
     }
     for (const [sh, v] of Object.entries(old)) setCoverSubject(sh, v);
     await printSheets(null, blocks);

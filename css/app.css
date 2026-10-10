@@ -108,6 +108,7 @@ td .rot{white-space:nowrap}
   body{background:#fff}
   .pp-page{page-break-after:always;break-after:page;box-sizing:border-box;overflow:hidden}
   .pp-page:last-child{page-break-after:auto;break-after:auto}
+  .pp-page.vc{display:flex;flex-direction:column;justify-content:center}
   .pp-page.land{page:land;width:297mm;height:210mm}
   .pp-page.port{page:port;width:210mm;height:297mm}
   table.xl{background:#fff} table.xl td{border-color:inherit}
