@@ -15,7 +15,7 @@
 
   const S = {
     code: null, school: null, grade: 1, data: null, wb: null, styles: null, names: null,
-    view: { rowHidden: {}, bg: {}, locked: new Set(), logo: null },
+    view: { rowHidden: {}, colHidden, bg: {}, locked: new Set(), logo: null },
     userEdits: {}, version: 0, dirty: false, saving: false, active: null, editing: null, sel: null,
     dvCache: {}, zoom: 'fit', saveTimer: null, offline: false,
   };
@@ -73,7 +73,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ป.' + g + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261010e');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261010f');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -81,7 +81,7 @@
     $('#xl-css').textContent = R.styleCss(S.styles);
     S.wb = new P.Workbook(S.data);
     S.names = M.detectNames(S.wb);
-    S.view = { rowHidden: {}, bg: {}, locked: new Set(), logo: null };
+    S.view = { rowHidden: {}, colHidden, bg: {}, locked: new Set(), logo: null };
     S.userEdits = {}; S.dvCache = {};
     buildDvIndex();
     // โหลดข้อมูลที่บันทึกไว้
@@ -111,27 +111,38 @@
 
   function ctx() { return { wb: S.wb, view: S.view, names: S.names, toast }; }
 
-  // ข้อมูลที่บันทึกก่อนเพิ่มช่อง "คะแนนรายตัวชี้วัด" (v1): เลื่อนคอลัมน์ชีทคะแนนรายวิชาให้ตรงผังใหม่
-  // และตั้งคะแนนเต็มตัวชี้วัดเป็น 0 เพื่อให้ผลคะแนน/ระดับเดิมไม่เปลี่ยน (ครูปรับคะแนนเต็มเองได้ภายหลัง)
+  // ข้อมูลที่บันทึกด้วยผังชีทคะแนนรายวิชาแบบเก่า -> ผังปัจจุบัน (ตัวชี้วัด 1-10 / เก็บ=รวมตัวชี้วัด / สอบ / รวม ต่อเทอม)
+  //  v1: A B เก็บ1 สอบ1 รวม1 เก็บ2 สอบ2 รวม2 ... หมายเหตุ(M)  -> คะแนนเก็บเดิมกลายเป็นตัวชี้วัด 1
+  //  v2: A B ตัวชี้วัด1 เก็บ1 สอบ1 รวม1 ตัวชี้วัด2 เก็บ2 สอบ2 ... หมายเหตุ(O) -> ตัวชี้วัด + เก็บเดิม เป็นตัวชี้วัด 1, 2
+  const SCORE_MAP = {
+    1: { C: 'C', D: 'N', F: 'P', G: 'AA', M: 'AG' },
+    2: { C: 'C', D: 'D', E: 'N', G: 'P', H: 'Q', I: 'AA', O: 'AG' },
+  };
+  const V2_MAX = { C4: 20, D4: 15, E4: 15, G4: 20, H4: 15, I4: 15 };   // คะแนนเต็มค่าเริ่มต้นของผัง v2
   function migrateDoc(doc) {
-    if (!doc || !doc.cells || (doc.v || 1) >= 2) return doc;
-    const OLD_MAX = { D4: 35, E4: 15, H4: 35, I4: 15 };   // คะแนนเต็มค่าเริ่มต้นของไฟล์เดิม
+    const v = (doc && doc.v) || 1;
+    if (!doc || !doc.cells || v >= 3) return doc;
     for (const [sheet, m] of Object.entries(doc.cells)) {
       if (!/^คะแนนรายวิชา \d+$/.test(sheet)) continue;
+      const src = Object.keys(m).length && v === 2 ? { ...V2_MAX, ...m } : m;
       const out = {};
-      for (const [ref, val] of Object.entries(m)) {
+      for (const [ref, val] of Object.entries(src)) {
         const a = /^([A-Z]+)(\d+)$/.exec(ref); if (!a) continue;
-        const c = P.colToNum(a[1]);
-        out[P.numToCol(c <= 2 ? c : c <= 5 ? c + 1 : c + 2) + a[2]] = val;
-      }
-      if (Object.keys(out).length) {
-        out.C4 = 0; out.G4 = 0;
-        for (const [k, v] of Object.entries(OLD_MAX)) if (!(k in out)) out[k] = v;
+        const col = P.colToNum(a[1]) <= 2 ? a[1] : SCORE_MAP[v][a[1]];
+        if (col) out[col + a[2]] = val;
       }
       doc.cells[sheet] = out;
     }
-    doc.v = 2;
+    doc.v = 3;
     return doc;
+  }
+
+  // ชีทคะแนนรายวิชา: ซ่อนคอลัมน์ตัวชี้วัดที่ยังไม่ได้กำหนดคะแนนเต็ม (แถว 4)
+  function colHidden(sheetName, c) {
+    const sh = S.wb.sheet(sheetName); const n = sh && sh.def.indicator; if (!n) return undefined;
+    if (!((c >= 3 && c < 3 + n) || (c >= 16 && c < 16 + n))) return undefined;
+    const v = S.wb.get(sh, 4, c);
+    return v === null || v === undefined || v === '';
   }
 
   function applyDoc(doc) {
@@ -316,7 +327,7 @@
   }
 
   // ---------------------------------------------------------------- save
-  function buildDoc() { return { v: 2, grade: S.grade, cells: S.userEdits, logo: S.view.logo || null, active: S.active, savedAt: new Date().toISOString() }; }
+  function buildDoc() { return { v: 3, grade: S.grade, cells: S.userEdits, logo: S.view.logo || null, active: S.active, savedAt: new Date().toISOString() }; }
   function markDirty() {
     if (S.batch) { S.pendingDirty = true; S.dirty = true; return; }
     S.dirty = true; setStatus('มีการแก้ไข... (จะบันทึกอัตโนมัติ)', 'dirty');

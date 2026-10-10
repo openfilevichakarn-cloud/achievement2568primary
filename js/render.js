@@ -87,7 +87,10 @@
       anchors.set(P.KEY(a.r1, a.c1), a);
       for (let r = a.r1; r <= a.r2; r++) for (let c = a.c1; c <= a.c2; c++) if (r !== a.r1 || c !== a.c1) covered.add(P.KEY(r, c));
     }
-    const colHidden = (c) => d.cw[c] && d.cw[c].h;
+    const colHidden = (c) => {
+      const ov = view && view.colHidden && view.colHidden(sheetName, c);   // true/false = บังคับ, undefined = ตามไฟล์
+      return ov !== undefined ? ov : !!(d.cw[c] && d.cw[c].h);
+    };
     const rowHidden = (r) => {
       const ov = view && view.rowHidden && view.rowHidden[sheetName];
       if (ov && ov.has(r)) return ov.get(r);
