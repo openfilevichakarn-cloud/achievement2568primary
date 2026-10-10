@@ -34,6 +34,7 @@
       beh: 'ค่าพฤติกรรม', cover1: find(/^ปก ปพ\.5 รายชั้น.*เทอม1$/),
       trait: (t) => find(new RegExp('^คุณลักษณะ.*เทอม' + t + '$')),
       act: (t) => find(new RegExp('^กิจกรรมพัฒนาผู้เรียน.*เทอม' + t + '$')),
+      traitY: find(/^คุณลักษณะ.* รวม$/), actY: find(/^กิจกรรมพัฒนาผู้เรียน.* รวม$/),   // ผลทั้งปี (คำนวณจาก 2 เทอม)
       score: (slot) => 'คะแนนรายวิชา ' + slot,
     };
     L.stuFirst = 3; L.stuLast = wb.sheet(L.stu).def.dim[0];
@@ -58,7 +59,7 @@
   }
   // คุณลักษณะ / กิจกรรม: หัวข้อ C.. (ชื่อในแถว 3 ของชีทเทอม 1) และคอลัมน์สรุป
   const AS = { trait: { max: 12, sum: 15 }, act: { max: 8, sum: 11 } };
-  const asSheet = (kind, t) => kind === 'trait' ? L.trait(t) : L.act(t);
+  const asSheet = (kind, t) => t === 'y' ? (kind === 'trait' ? L.traitY : L.actY) : kind === 'trait' ? L.trait(t) : L.act(t);
   const activeItems = (kind) => range(3, AS[kind].max).filter(c => txt(asSheet(kind, 1), 3, c).trim());
   const stuScoreRow = (r) => r + 3, stuTraitRow = (r) => r + 1;
   // ชีทคะแนนรายวิชา: ตัวชี้วัด 1-10 / เก็บ (=รวมตัวชี้วัด) / สอบ / รวม / ระดับ ของแต่ละเทอม
@@ -505,20 +506,20 @@
   function vAssess() {
     const stu = students();
     if (!stu.length) return `<div class="card empty"><b>ยังไม่มีนักเรียน</b><br><button class="btn primary" data-act="goto" data-to="data:students">ไปเพิ่มนักเรียน</button></div>`;
-    const t = U.aTerm, kind = U.kind;
+    const t = U.aTerm, kind = U.kind, Y = t === 'y';
     const sheet = asSheet(kind, t), kc = AS[kind].sum, heads = activeItems(kind);
     const names = `<div class="card soft"><div class="hint" style="margin-bottom:6px">ชื่อหัวข้อ${kind === 'trait' ? 'คุณลักษณะ' : 'กิจกรรม'} (ใช้ทั้งเทอม 1 และเทอม 2) · สูงสุด ${AS[kind].max} หัวข้อ</div>
       <div class="maxbox">${heads.map((c, i) => field('หัวข้อ ' + (i + 1), inputFor(asSheet(kind, 1), 3, c, { after: 'rerender' }), 'wname')).join('')}
       <div class="row indbtn"><button class="btn sm" data-act="as-add"${heads.length >= AS[kind].max ? ' disabled' : ''}>＋ เพิ่มหัวข้อ</button><button class="btn sm" data-act="as-del"${heads.length <= 1 ? ' disabled' : ''}>－ ลดหัวข้อ</button></div></div></div>`;
-    const head = `<tr><th class="no">ที่</th><th class="stk">ชื่อ - สกุล</th>${heads.map(c => `<th data-act="acol" data-c="${c}" title="แตะเพื่อตั้งทั้งห้องเป็น ผ่าน">${esc(oneLine(txt(sheet, 3, c)))}</th>`).join('')}<th class="ro" style="min-width:70px;cursor:default">สรุป</th></tr>`;
+    const head = `<tr><th class="no">ที่</th><th class="stk">ชื่อ - สกุล</th>${heads.map(c => Y ? `<th style="cursor:default">${esc(oneLine(txt(sheet, 3, c)))}</th>` : `<th data-act="acol" data-c="${c}" title="แตะเพื่อตั้งทั้งห้องเป็น ผ่าน">${esc(oneLine(txt(sheet, 3, c)))}</th>`).join('')}<th class="ro" style="min-width:70px;cursor:default">สรุป</th></tr>`;
     const body = stu.map((st, i) => {
       const r = stuTraitRow(st.r);
-      return `<tr><td class="no">${esc(st.no)}</td><td class="stk">${esc(st.name)}</td>${heads.map((c, j) => gcell(sheet, r, c, 'pass', i, j)).join('')}${rocell(sheet, r, kc, 'pass')}</tr>`;
+      return `<tr><td class="no">${esc(st.no)}</td><td class="stk">${esc(st.name)}</td>${heads.map((c, j) => Y ? rocell(sheet, r, c, 'pass') : gcell(sheet, r, c, 'pass', i, j)).join('')}${rocell(sheet, r, kc, 'pass')}</tr>`;
     }).join('');
-    return `<div class="bar">${seg([['trait', 'คุณลักษณะอันพึงประสงค์'], ['act', 'กิจกรรมพัฒนาผู้เรียน']], kind, 'akind')}${seg([[1, 'เทอม 1'], [2, 'เทอม 2']], t, 'aterm')}</div>${names}
-      <p class="sub">ใช้งานเหมือนชีท Excel: พิมพ์ <b>ผ่าน</b> / <b>ไม่ผ่าน</b> (หรือ 1 / 0, ✓ / ✗) · Space สลับค่า · ดับเบิลคลิกเพื่อสลับ · วางหลายช่องจาก Excel ได้ · แตะหัวคอลัมน์เพื่อตั้งทั้งห้องเป็น “ผ่าน”</p>
+    return `<div class="bar">${seg([['trait', 'คุณลักษณะอันพึงประสงค์'], ['act', 'กิจกรรมพัฒนาผู้เรียน']], kind, 'akind')}${seg([[1, 'เทอม 1'], [2, 'เทอม 2'], ['y', 'ทั้งปี']], t, 'aterm')}</div>${names}
+      ${Y ? `<p class="sub">ผลทั้งปีคำนวณจากเทอม 1 และเทอม 2 อัตโนมัติ (แก้ไขที่หน้าเทอม): หัวข้อที่ <b>ไม่ผ่าน</b> เทอมใดเทอมหนึ่ง = ไม่ผ่าน · <b>ผ่าน</b> ทั้ง 2 เทอม = ผ่าน · ยังประเมินไม่ครบ = ว่าง</p>${gridWrap('assess', head, body)}` : `<p class="sub">ใช้งานเหมือนชีท Excel: พิมพ์ <b>ผ่าน</b> / <b>ไม่ผ่าน</b> (หรือ 1 / 0, ✓ / ✗) · Space สลับค่า · ดับเบิลคลิกเพื่อสลับ · วางหลายช่องจาก Excel ได้ · แตะหัวคอลัมน์เพื่อตั้งทั้งห้องเป็น “ผ่าน”</p>
       <div class="bar"><button class="btn" data-act="aall" data-v="ผ่าน">ตั้งทั้งหมดเป็น “ผ่าน”</button><button class="btn danger" data-act="aall" data-v="">ล้างทั้งหมด</button></div>
-      ${gridWrap('assess', head, body)}`;
+      ${gridWrap('assess', head, body)}`}`;
   }
   function asAdd() {
     const kind = U.kind, used = activeItems(kind);
@@ -611,11 +612,10 @@
   // ---------------------------------------------------------------- รายงาน ปพ.5 (หน้าปก รายชั้น/รายวิชา + แบบบันทึกคะแนน + คุณลักษณะ/กิจกรรม)
   function p5Sheets(T) {
     const all = WB().sheets.map(s => s.name), key = T === 'sum' ? 'รวม' : 'เทอม' + T;
-    const terms = T === 'sum' ? [1, 2] : [T];
     return {
       cls: all.find(n => n === 'ปก ปพ.5 รายชั้น ' + key),
       subj: all.find(n => n === 'ปก ปพ.5 รายวิชา ' + key),
-      assess: terms.flatMap(t => [L.trait(t), L.act(t)]).filter(Boolean),
+      assess: (T === 'sum' ? [L.traitY, L.actY] : [L.trait(T), L.act(T)]).filter(Boolean),
     };
   }
   function vReport5() {
@@ -687,7 +687,7 @@
       case 'sterm': U.scoreTerm = b.dataset.k === 'y' ? 'y' : +b.dataset.k; refresh(); break;
       case 'subj-step': { const subs = subjects(); const i = subs.findIndex(s => s.r === curSubject().r) + (+b.dataset.d); if (subs[i]) { U.slot = subs[i].r; refresh(); } break; }
       case 'akind': U.kind = b.dataset.k; refresh(); break;
-      case 'aterm': U.aTerm = +b.dataset.k; refresh(); break;
+      case 'aterm': U.aTerm = b.dataset.k === 'y' ? 'y' : +b.dataset.k; refresh(); break;
       case 'acol': setAssessAll('ผ่าน', +b.dataset.c); break;
       case 'aall': setAssessAll(b.dataset.v); break;
       case 'rmode': U.repMode = b.dataset.k; refresh(); break;
