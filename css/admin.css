@@ -1,0 +1,22 @@
+/* admin.css — หน้าผู้ดูแล */
+body.admin{overflow:auto}
+.a-wrap{padding:18px;max-width:1500px;margin:0 auto}
+.a-issue{display:grid;grid-template-columns:1fr;gap:12px}
+@media (min-width:900px){.a-issue{grid-template-columns:1.4fr 1fr}}
+.a-issue textarea{width:100%;min-height:110px;border:1px solid var(--line);border-radius:10px;padding:.6rem;background:var(--bg);font-size:16px;font-family:inherit}
+.gchk{display:flex;flex-wrap:wrap;gap:6px 14px;padding:6px 0}
+.gchk label{display:flex;align-items:center;gap:5px;cursor:pointer}
+.a-tw{max-height:none}
+.a-table td{text-align:left;vertical-align:middle;padding:8px 10px}
+.a-table th{text-align:left;cursor:default}
+.a-table tr.off td{opacity:.6}
+table.a-table .stk{max-width:300px;min-width:180px;white-space:normal;overflow:visible;text-overflow:clip}
+.a-note{max-width:220px;white-space:normal}
+.a-act{flex-wrap:nowrap;gap:6px}
+.a-modal{width:min(560px,100%)}
+.a-codes{display:grid;gap:6px;max-height:50dvh;overflow:auto;margin-top:8px}
+.a-code{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.a-code span{flex:1;min-width:0}
+.a-code code{font-size:1.05rem;letter-spacing:.06em;font-weight:700;user-select:all}
+.login-card input[type=password]{width:100%;padding:.65rem .8rem;border:1px solid var(--line);border-radius:10px;background:var(--bg);font-size:1.1rem}
+@media (max-width:700px){ .a-wrap{padding:10px} #l-q{width:100% !important} }
