@@ -74,7 +74,8 @@
     try { await navigator.clipboard.writeText(text); toast('คัดลอกแล้ว', 'ok'); }
     catch (e) { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('คัดลอกแล้ว', 'ok'); }
   }
-  const gradeChecks = (sel, name) => GRADES.map(g => `<label><input type="checkbox" name="${name}" value="${g}"${sel.includes(g) ? ' checked' : ''}> ป.${g}</label>`).join('');
+  const READY = cfg.GRADES_READY || GRADES;
+  const gradeChecks = (sel, name) => GRADES.map(g => `<label${READY.includes(g) ? '' : ' class="nr" title="ยังไม่มีข้อมูลโปรแกรมชั้นนี้ (ให้สิทธิ์ไว้ก่อนได้ จะใช้ได้เมื่อเปิดชั้นนี้)"'}><input type="checkbox" name="${name}" value="${g}"${sel.includes(g) ? ' checked' : ''}> ป.${g}${READY.includes(g) ? '' : ' <small>(ยังไม่เปิด)</small>'}</label>`).join('');
   const readGrades = (root, name) => $$(`input[name="${name}"]:checked`, root).map(x => +x.value);
   const fmtDate = (s) => { if (!s) return '–'; const d = new Date(s); return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' }) + ' ' + d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }); };
   function guard(fn) {

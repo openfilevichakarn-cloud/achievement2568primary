@@ -105,7 +105,7 @@
   }
   function mount() {
     buildLayout();
-    const sel = currentStudent(); if (!sel && students().length) A().S.wb.setValue(L.sum, { r: 3, c: 2 }, students()[0].name);
+    ensureCurrentStudent();
     const v = $('#view');
     if (!v.dataset.bound) {
       v.dataset.bound = '1';
@@ -131,7 +131,7 @@
   }
   function refresh() { if (!L) return; const v = $('#view'); const top = v.scrollTop; renderTabbar(); render(); v.scrollTop = top; }
   function render() {
-    if (L) syncAbilities();
+    if (L) { syncAbilities(); ensureCurrentStudent(); }
     const fn = { home: vHome, data: vData, scores: vScores, assess: vAssess, report: vReport, report5: vReport5, docs: vDocs }[U.tab];
     $('#view').innerHTML = `<div class="page">${fn()}</div>`;
     if (U.tab === 'report') afterReport();
@@ -430,7 +430,7 @@
   // หลังแก้ชื่อนักเรียน: เดาเพศจากคำนำหน้า และตั้งนักเรียนที่เลือกในรายงานถ้ายังไม่มี
   function afterStudentNames(rows) {
     for (const r of rows) { const nm = txt(L.stu, r, 2); if (nm && !txt(L.stu, r, 3)) { const g = guessSex(nm); if (g) setv(L.stu, r, 3, g); } }
-    const first = students()[0]; if (first && !currentStudent()) WB().setValue(L.sum, { r: 3, c: 2 }, first.name);
+    ensureCurrentStudent();
   }
 
   // ---------------------------------------------------------------- วางข้อมูลจาก Excel / Google Sheets
@@ -546,6 +546,12 @@
 
   // ---------------------------------------------------------------- รายงาน
   const currentStudent = () => { const v = get(L.sum, 3, 2); return v === null ? null : String(v); };
+  // นักเรียนที่เลือกในรายงานต้องมีอยู่ในรายชื่อ (ไฟล์ต้นแบบบางชั้นมีชื่อตัวอย่างค้างอยู่) ไม่งั้นเลือกคนแรก
+  function ensureCurrentStudent() {
+    const cur = currentStudent(), list = students();
+    if (cur && list.some(s => s.name === cur)) return;
+    WB().setValue(L.sum, { r: 3, c: 2 }, list.length ? list[0].name : null);
+  }
   function readReport(which) {
     const sheet = which === 'sum' ? L.sum : L.term[which]; const beh = which === 'sum' ? L.sumBeh : L.termBeh[which];
     return L.ab.map((r, i) => {

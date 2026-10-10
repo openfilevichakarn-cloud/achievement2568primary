@@ -20,3 +20,4 @@ table.a-table .stk{max-width:300px;min-width:180px;white-space:normal;overflow:v
 .a-code code{font-size:1.05rem;letter-spacing:.06em;font-weight:700;user-select:all}
 .login-card input[type=password]{width:100%;padding:.65rem .8rem;border:1px solid var(--line);border-radius:10px;background:var(--bg);font-size:1.1rem}
 @media (max-width:700px){ .a-wrap{padding:10px} #l-q{width:100% !important} }
+.gchk label.nr{color:var(--muted)}

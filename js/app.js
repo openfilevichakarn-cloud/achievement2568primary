@@ -53,9 +53,14 @@
     try {
       const res = await backend.login(code);
       if (!res || !res.ok) throw new Error((res && res.error) || 'รหัสสิทธิ์ไม่ถูกต้อง');
-      S.code = code; S.school = { name: res.school_name, grades: res.grades && res.grades.length ? res.grades : [1] };
+      const ready = (window.PP_CONFIG && PP_CONFIG.GRADES_READY) || [1];
+      const granted = res.grades && res.grades.length ? res.grades : [1];
+      const grades = granted.filter(g => ready.includes(g));
+      if (!grades.length) throw new Error('ชั้นที่โรงเรียนได้รับสิทธิ์ (ป.' + granted.join(', ป.') + ') ยังไม่เปิดให้ใช้งาน กรุณาติดต่อผู้ดูแล');
+      S.code = code; S.school = { name: res.school_name, grades };
       if (remember) LS.set('pp_code', code); else LS.del('pp_code');
-      await openGrade(S.school.grades.length === 1 ? S.school.grades[0] : (+LS.get('pp_grade') || S.school.grades[0]));
+      const last = +LS.get('pp_grade');
+      await openGrade(S.school.grades.includes(last) ? last : S.school.grades[0]);
     } catch (e) {
       $('#login-err').textContent = e.offline ? 'เชื่อมต่ออินเทอร์เน็ตไม่ได้ กรุณาลองใหม่' : (e.message || 'เข้าสู่ระบบไม่สำเร็จ');
       LS.del('pp_code');
@@ -73,7 +78,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ป.' + g + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261010u');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261010x');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }

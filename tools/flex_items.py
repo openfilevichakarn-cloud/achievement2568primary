@@ -111,16 +111,21 @@ for s in d['sheets']:
     s['flex'] = {'indName': 47}
 
 # ---------------------------------------------------------------- 4) ความสามารถชั้นปี
-summ = S['ปพ.6 ป.1รวม']
+SUM = next(n for n in S if re.match(r'^ปพ\.6 ป\.\d+รวม$', n))
+TERMS = [next(n for n in S if re.match(rf'^ปพ\.6 ป\.\d+ เทอม{t}$', n)) for t in (1, 2)]
+summ = S[SUM]
 for i in range(8):
     r = 6 + 3 * i; k = f'A{r}'; c = summ['cells'][k]; v = c.pop('v', None)
-    c['f'] = f'IF($I${6 + i}="","",{i + 1}&".  "&$I${6 + i})'
-    if v is not None: c['c'] = v
-    for t in ('ปพ.6 ป.1 เทอม1', 'ปพ.6 ป.1 เทอม2'):
+    c['f'] = f'IF($I${6 + i}="","",{i + 1}&".  "&$I${6 + i})'   # ค่าแคช: เติมใหม่ด้วย fill_cache.js
+    for t in TERMS:
         tc = S[t]['cells'][k]; tv = tc.pop('v', None)
-        tc['f'] = f"'ปพ.6 ป.1รวม'!{k}"
-        if tv is not None: tc['c'] = tv
+        tc['f'] = f"'{SUM}'!{k}"
 summ['flex'] = {'abilities': [6, 13]}
+# ข้อมูลวิชา!C (ข้อที่ของความสามารถ): ค้นในชื่อทั้ง 8 ช่อง (บางชั้นเดิมค้นแค่ 7 ช่องและใช้สูตรแบบอาร์เรย์)
+for k, c in S['ข้อมูลวิชา']['cells'].items():
+    m = re.fullmatch(r'C(\d+)', k)
+    if m and int(m[1]) >= 2 and c.get('f'):
+        c['f'] = f"IFERROR(MATCH(B{m[1]},'{SUM}'!$I$6:$I$13,0),\"\")"
 
 json.dump(d, open(path, 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
 print('patched', path)

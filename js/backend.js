@@ -38,7 +38,7 @@
     constructor() { this.demo = true; }
     async login(code) {
       if (norm(code) !== 'DEMO') throw new Error('โหมดทดลองใช้รหัส DEMO');
-      return { ok: true, school_name: 'โรงเรียนตัวอย่าง (โหมดทดลอง)', grades: [1] };
+      return { ok: true, school_name: 'โรงเรียนตัวอย่าง (โหมดทดลอง)', grades: (root.PP_CONFIG && root.PP_CONFIG.GRADES_READY) || [1] };
     }
     async load(code, grade) {
       let raw = null; try { raw = localStorage.getItem('pp_demo_' + grade); } catch (e) { /* ignore */ }

@@ -35,7 +35,7 @@ def restyle(cells, k, **kw):
 for s in d['sheets']:
     n = s['name']
     cover = n.startswith('ปก ปพ.5')
-    p6 = n in ('ปพ.6 ป.1รวม', 'ปพ.6 ป.1 เทอม1', 'ปพ.6 ป.1 เทอม2')
+    p6 = bool(re.match(r'^ปพ\.6 ป\.\d+ ?(รวม|เทอม[12])$', n))
     if not (cover or p6): continue
     cells = s['cells']
     # 1) ฟอนต์ 16
