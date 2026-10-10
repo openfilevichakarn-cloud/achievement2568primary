@@ -12,7 +12,7 @@
 }
 *{box-sizing:border-box}
 html,body{height:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 'Sarabun','TH Sarabun New',system-ui,sans-serif}
+body{margin:0;background:var(--bg);color:var(--ink);font:1rem/1.45 'Sarabun','TH Sarabun New',system-ui,sans-serif}
 button,input,select{font:inherit;color:inherit}
 .grow{flex:1}
 .btn{border:1px solid var(--line);background:var(--panel);padding:.35rem .85rem;border-radius:8px;cursor:pointer;min-height:36px}

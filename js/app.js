@@ -73,7 +73,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ป.' + g + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261010h');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261010i');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -242,7 +242,7 @@
     const out = sheetHtmlFor(S.active, false, area);
     const host = $('#sheet-host'); host.innerHTML = out.html;
     const avail = Math.max(200, $('#sheet-scroll').clientWidth - 28);
-    const z = S.zoom === 'fit' ? Math.min(1, avail / Math.max(1, out.width)) : +S.zoom;
+    const z = S.zoom === 'fit' ? Math.min(1.6, avail / Math.max(1, out.width)) : +S.zoom;   // พอดีจอ: ขยายเกิน 100% ได้บนจอใหญ่
     host.style.zoom = Math.max(0.2, z);
   }
 
@@ -280,7 +280,7 @@
     }
     const sp = document.createElement('span'); sp.className = 'grow'; tb.appendChild(sp);
     const z = document.createElement('label'); z.className = 'zoom';
-    z.innerHTML = 'ขนาด <select id="zoom"><option value="fit"' + (S.zoom === 'fit' ? ' selected' : '') + '>พอดีหน้าจอ</option>' + [0.6, 0.75, 1, 1.25].map(v => `<option value="${v}"${+S.zoom === v ? ' selected' : ''}>${Math.round(v * 100)}%</option>`).join('') + '</select>';
+    z.innerHTML = 'ขนาด <select id="zoom"><option value="fit"' + (S.zoom === 'fit' ? ' selected' : '') + '>พอดีหน้าจอ</option>' + [0.6, 0.75, 1, 1.25, 1.5].map(v => `<option value="${v}"${+S.zoom === v ? ' selected' : ''}>${Math.round(v * 100)}%</option>`).join('') + '</select>';
     tb.appendChild(z);
     $('#zoom').onchange = (e) => { S.zoom = e.target.value === 'fit' ? 'fit' : +e.target.value; renderSheet(); };
   }
