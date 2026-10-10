@@ -3,7 +3,7 @@
  * 2) ถ้าเว้นว่าง เว็บจะทำงานใน "โหมดทดลอง" (เก็บข้อมูลในเบราว์เซอร์เครื่องนี้ ใช้รหัส DEMO) — ห้ามใช้ขายจริง
  * anon key ออกแบบมาให้เปิดเผยในเว็บได้ ความปลอดภัยอยู่ที่ RLS + ฟังก์ชันใน sql/schema.sql  */
 window.PP_CONFIG = {
-  SUPABASE_URL: '',
-  SUPABASE_ANON_KEY: '',
+  SUPABASE_URL: 'https://htyytgkpufyhythcbofq.supabase.co',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh0eXl0Z2twdWZ5aHl0aGNib2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE0NTc1NjcsImV4cCI6MjEwNzAzMzU2N30.FvV_iWfzuUdJlrMIHz-DrmZAhjS-XNzevK3bbtu2xIM',
   BUILD: '1',
 };
