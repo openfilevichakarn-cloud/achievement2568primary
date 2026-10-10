@@ -680,13 +680,62 @@
       ? row(esc(oneLine(s.name)), da({ act: 'p5-open', n: P.subj, s: s.name }), da({ act: 'p5-print', set: kind, i }))
       : row(esc(oneLine(s.name)), da({ act: 'open-doc', n: L.score(s.slot) }), da({ act: 'print-doc', n: L.score(s.slot) }))).join('');
     return `<div class="bar">${seg([[1, 'เทอม 1'], [2, 'เทอม 2'], ['sum', 'ทั้งปี (รวม)']], T, 'p5term')}<span class="grow"></span><button class="btn primary" data-act="p5-print" data-set="all">🖨 พิมพ์ ปพ.5 ทั้งชุด</button></div>
-      <p class="sub">สมุดบันทึกการพัฒนาคุณภาพผู้เรียน (ปพ.5) — ทั้งชุด = ปกรายชั้น + ปกรายวิชาทุกวิชา + แบบบันทึกคะแนนทุกวิชา + คุณลักษณะ/กิจกรรม</p>
+      ${p5Summary(T, subs)}
+      <h3 class="p5h">เอกสาร ปพ.5 สำหรับพิมพ์</h3>
+      <p class="sub">ทั้งชุด = ปกรายชั้น + ปกรายวิชาทุกวิชา + แบบบันทึกคะแนนทุกวิชา + คุณลักษณะ/กิจกรรม</p>
       <div class="p5grid">
       <div class="card"><h3>ปก ปพ.5 รายชั้น</h3>${row('ภาพรวมทั้งชั้น', da({ act: 'open-doc', n: P.cls }), da({ act: 'print-doc', n: P.cls }))}</div>
       <div class="card"><h3>ปก ปพ.5 รายวิชา</h3><div class="row" style="margin-bottom:6px"><span class="hint">${subs.length} วิชา</span><span class="grow"></span><button class="btn sm" data-act="p5-print" data-set="cover">พิมพ์ทุกวิชา</button></div>${subRows('cover')}</div>
       <div class="card"><h3>แบบบันทึกคะแนนรายวิชา</h3><div class="row" style="margin-bottom:6px"><span class="hint">ทั้งปี (เทอม 1 + เทอม 2) ในแผ่นเดียว</span><span class="grow"></span><button class="btn sm" data-act="p5-print" data-set="score">พิมพ์ทุกวิชา</button></div>${subRows('score')}</div>
       <div class="card"><h3>คุณลักษณะ / กิจกรรมพัฒนาผู้เรียน</h3>${P.assess.map(n => row(esc(n), da({ act: 'open-doc', n }), da({ act: 'print-doc', n }))).join('')}</div>
       </div>`;
+  }
+  // ตารางสรุป ปพ.5 ของเทอมที่เลือก (คำนวณจากชีทคะแนน/คุณลักษณะ/กิจกรรม)
+  function p5Summary(T, subs) {
+    const stu = students(), n = stu.length;
+    const col = T === 'sum' ? { tot: SC.year, lvl: SC.yearLvl } : { tot: SC[T].tot, lvl: SC[T].lvl };
+    const male = stu.filter(s => s.sex === 'ชาย').length, female = stu.filter(s => s.sex === 'หญิง').length;
+    const fmt = (x, d = 1) => x === null ? '–' : (Math.round(x * 10 ** d) / 10 ** d).toLocaleString('th-TH');
+    const rows = subs.map(s => {
+      const sc = L.score(s.slot), max = num(sc, 4, col.tot), cnt = [0, 0, 0, 0];
+      let sum = 0, got = 0;
+      for (const st of stu) {
+        const r = stuScoreRow(st.r), v = num(sc, r, col.tot);
+        if (v === null) continue;
+        got++; sum += v; const k = lvIdx(txt(sc, r, col.lvl)); if (k >= 0) cnt[k]++;
+      }
+      const avg = got ? sum / got : null;
+      return { s, code: txt(L.sub, s.sr, 2), max, got, avg, pct: avg !== null && max ? avg / max * 100 : null, cnt };
+    });
+    const tot = rows.reduce((a, r) => { r.cnt.forEach((x, k) => a[k] += x); return a; }, [0, 0, 0, 0]), totN = tot.reduce((a, b) => a + b, 0);
+    const filled = rows.reduce((a, r) => a + r.got, 0), need = rows.length * n;
+    const allAvg = rows.filter(r => r.pct !== null); const avgPct = allAvg.length ? allAvg.reduce((a, r) => a + r.pct, 0) / allAvg.length : null;
+    const distBar = (c) => { const m = c.reduce((a, b) => a + b, 0); return m ? `<div class="dist">${c.map((x, k) => `<i class="d${k}" style="width:${x / m * 100}%" title="${LEVELS[k]} ${x} คน"></i>`).join('')}</div>` : '<div class="hint">ยังไม่มีผล</div>'; };
+    const lvCell = (x, k) => `<td class="num">${x ? `<span class="lvn l${k}">${x}</span>` : '<span class="hint">–</span>'}</td>`;
+    // คุณลักษณะ / กิจกรรม: นับจากช่องสรุปของชีทเทอม (หรือชีททั้งปี)
+    const asRow = (kind, label) => {
+      const sh = T === 'sum' ? (kind === 'trait' ? L.traitY : L.actY) : asSheet(kind, T); if (!sh) return '';
+      let ok = 0, no = 0;
+      for (const st of stu) { const v = txt(sh, stuTraitRow(st.r), AS[kind].sum); if (v === 'ผ่าน') ok++; else if (v === 'ไม่ผ่าน') no++; }
+      return `<tr><td style="text-align:left">${label}</td><td class="num"><span class="pass ok">${ok}</span></td><td class="num">${no ? `<span class="pass no">${no}</span>` : '0'}</td><td class="num hint">${n - ok - no}</td><td>${n ? `<div class="dist"><i class="d3" style="width:${ok / n * 100}%"></i><i class="d0" style="width:${no / n * 100}%"></i></div>` : ''}</td></tr>`;
+    };
+    const tLabel = T === 'sum' ? 'ทั้งปี' : 'เทอม ' + T;
+    return `<div class="p5stats">
+        <div class="stat"><b>${n}</b><span>นักเรียน (ชาย ${male} · หญิง ${female})</span></div>
+        <div class="stat"><b>${rows.length}</b><span>รายวิชา</span></div>
+        <div class="stat"><b>${need ? Math.round(filled / need * 100) : 0}%</b><span>กรอกคะแนนแล้ว (${tLabel})</span></div>
+        <div class="stat"><b>${fmt(avgPct)}${avgPct === null ? '' : '%'}</b><span>คะแนนเฉลี่ยทุกวิชา</span></div>
+      </div>
+      <div class="card"><h3>สรุปผลสัมฤทธิ์รายวิชา — ${tLabel}</h3>
+        <div class="tw p5tw"><table class="t p5t"><thead><tr><th class="stk">รายวิชา</th><th>กรอกแล้ว</th><th>เฉลี่ย</th><th>ร้อยละ</th>${LEVELS.map((l, k) => `<th class="lvh l${k}">${l}</th>`).join('')}<th style="min-width:140px">การกระจาย</th></tr></thead><tbody>
+        ${rows.map(r => `<tr><td class="stk"><b>${esc(oneLine(r.s.name))}</b>${r.code ? `<div class="hint">${esc(r.code)}</div>` : ''}</td>
+          <td class="num ${r.got < n ? 'warnc' : ''}">${r.got}/${n}</td><td class="num">${fmt(r.avg)}<span class="hint"> / ${r.max ?? '–'}</span></td><td class="num">${r.pct === null ? '–' : fmt(r.pct) + '%'}</td>
+          ${r.cnt.map(lvCell).join('')}<td>${distBar(r.cnt)}</td></tr>`).join('')}
+        </tbody><tfoot><tr><td class="stk"><b>รวมทุกวิชา</b></td><td class="num">${filled}/${need}</td><td></td><td class="num"><b>${avgPct === null ? '–' : fmt(avgPct) + '%'}</b></td>${tot.map(lvCell).join('')}<td>${distBar(tot)}</td></tr></tfoot></table></div>
+        <p class="hint">ระดับตามเกณฑ์ร้อยละ 75 / 65 / 55 · นับเฉพาะนักเรียนที่มีคะแนนแล้ว${totN ? ` · รวม ${totN} ผลการประเมิน` : ''}</p></div>
+      <div class="card"><h3>สรุปคุณลักษณะอันพึงประสงค์ / กิจกรรมพัฒนาผู้เรียน — ${tLabel}</h3>
+        <div class="tw p5tw"><table class="t p5t"><thead><tr><th style="text-align:left">รายการ</th><th>ผ่าน</th><th>ไม่ผ่าน</th><th>ยังไม่ประเมิน</th><th style="min-width:140px">สัดส่วน</th></tr></thead>
+        <tbody>${asRow('trait', 'คุณลักษณะอันพึงประสงค์')}${asRow('act', 'กิจกรรมพัฒนาผู้เรียน')}</tbody></table></div></div>`;
   }
   function p5Print(set, i) {
     const subs = subjects(), P = p5Sheets(U.p5Term);

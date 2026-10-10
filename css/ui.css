@@ -230,3 +230,22 @@ input.gc.no{background:#fee2e2;color:var(--err);font-weight:700}
 .seg.sm button{min-height:30px;padding:.2rem .6rem;font-size:.85rem}
 .stexp{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--line)}
 .stexp:first-of-type{border-top:0}
+
+/* รายงาน ปพ.5: ตารางสรุป */
+.p5stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:0 0 12px}
+.p5stats .stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column}
+.p5stats .stat b{font-size:1.6rem;line-height:1.2}
+.p5stats .stat span{color:var(--muted);font-size:.85rem}
+.p5tw{max-height:none}
+table.p5t td,table.p5t th{padding:6px 10px}
+table.p5t td.num{text-align:center;white-space:nowrap}
+table.p5t td.stk{white-space:normal;min-width:180px;max-width:280px}
+table.p5t thead th{cursor:default;vertical-align:middle}
+table.p5t tfoot td{background:var(--soft);font-weight:600;border-top:2px solid var(--line)}
+table.p5t .warnc{color:var(--warn);font-weight:600}
+.lvn{display:inline-block;min-width:1.8em;padding:.05rem .4rem;border-radius:99px;font-weight:700}
+.lvn.l0,.lvh.l0{color:var(--lv0)} .lvn.l0{background:var(--lv0bg)}
+.lvn.l1,.lvh.l1{color:var(--lv1)} .lvn.l1{background:var(--lv1bg)}
+.lvn.l2,.lvh.l2{color:var(--lv2)} .lvn.l2{background:var(--lv2bg)}
+.lvn.l3,.lvh.l3{color:var(--lv3)} .lvn.l3{background:var(--lv3bg)}
+.p5h{margin:18px 0 4px}
