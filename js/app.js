@@ -73,7 +73,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ป.' + g + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261010i');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261010j');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -139,7 +139,14 @@
 
   // ชีทคะแนนรายวิชา: ซ่อนคอลัมน์ตัวชี้วัดที่ยังไม่ได้กำหนดคะแนนเต็ม (แถว 4)
   function colHidden(sheetName, c) {
-    const sh = S.wb.sheet(sheetName); const n = sh && sh.def.indicator; if (!n) return undefined;
+    const sh = S.wb.sheet(sheetName); if (!sh) return undefined;
+    // คุณลักษณะ / กิจกรรม: ซ่อนหัวข้อที่ชื่อว่าง (แถว 3)
+    const fx = sh.def.flex;
+    if (fx && fx.items) {
+      if (c < fx.items[0] || c > fx.items[1]) return undefined;
+      const h = S.wb.get(sh, 3, c); return h === null || h === undefined || String(h).trim() === '';
+    }
+    const n = sh.def.indicator; if (!n) return undefined;
     if (!((c >= 3 && c < 3 + n) || (c >= 16 && c < 16 + n))) return undefined;
     const v = S.wb.get(sh, 4, c);
     return v === null || v === undefined || v === '';

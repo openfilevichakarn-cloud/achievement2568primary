@@ -38,11 +38,11 @@
     };
     L.stuFirst = 3; L.stuLast = wb.sheet(L.stu).def.dim[0];
     L.subFirst = 2; L.subLast = wb.sheet(L.subj).def.dim[0];
-    const sm = wb.sheet(L.sum); L.ab = [];
-    for (let r = 6; r <= sm.def.dim[0]; r++) { const v = wb.get(sm, r, 1); if (typeof v === 'string' && /^\s*\d+\s*\.\s/.test(v)) L.ab.push(r); }
-    L.abText = L.ab.map((r, i) => txt(L.sum, 6 + i, 9));
+    // ความสามารถชั้นปี: 8 ช่อง (ปพ.6 รวม แถว 6,9,...,27) ชื่ออยู่ที่ I6:I13 — ชื่อว่าง = ไม่ใช้
+    L.abAll = Array.from({ length: AB_MAX }, (_, i) => 6 + 3 * i);
+    syncAbilities();
     // แถวคำอธิบายพฤติกรรมของแต่ละความสามารถ (อ่านจากสูตรชีท ป.1-2)
-    L.behRow = L.ab.map((r, i) => {
+    L.behRow = L.abAll.map((r, i) => {
       const sh = wb.sheet(L.sumBeh); const cell = sh && sh.cells.get(P.KEY(4 + i, 4));
       const m = cell && cell.f && /ค่าพฤติกรรม!\$?B\$?(\d+)/.exec(cell.f);
       return m ? +m[1] : null;
@@ -50,11 +50,23 @@
     L.maxSub = L.subLast - L.subFirst + 1;
   }
 
+  const AB_MAX = 8;
+  const abName = (i) => txt(L.sum, 6 + i, 9);
+  function syncAbilities() {   // L.ab / L.abText = เฉพาะความสามารถที่ใช้งาน (เรียงต่อกันจากข้อ 1)
+    L.ab = L.abAll.filter((r, i) => abName(i).trim());
+    L.abText = L.ab.map((r, i) => abName(i));
+  }
+  // คุณลักษณะ / กิจกรรม: หัวข้อ C.. (ชื่อในแถว 3 ของชีทเทอม 1) และคอลัมน์สรุป
+  const AS = { trait: { max: 12, sum: 15 }, act: { max: 8, sum: 11 } };
+  const asSheet = (kind, t) => kind === 'trait' ? L.trait(t) : L.act(t);
+  const activeItems = (kind) => range(3, AS[kind].max).filter(c => txt(asSheet(kind, 1), 3, c).trim());
   const stuScoreRow = (r) => r + 3, stuTraitRow = (r) => r + 1;
   // ชีทคะแนนรายวิชา: ตัวชี้วัด 1-10 / เก็บ (=รวมตัวชี้วัด) / สอบ / รวม / ระดับ ของแต่ละเทอม
   const NIND = 10, range = (a, n) => Array.from({ length: n }, (_, i) => a + i);
   const SC = { 1: { ind: range(3, NIND), keep: 13, exam: 14, tot: 15, lvl: 30 },
                2: { ind: range(16, NIND), keep: 26, exam: 27, tot: 28, lvl: 31 }, year: 29, yearLvl: 32, note: 33 };
+  const IND_NAME_ROW = 47;   // ชื่อตัวชี้วัดเก็บในแถว 47 ของชีทคะแนน (นอกพื้นที่แสดงผล)
+  const indLabel = (sc, c, i) => txt(sc, IND_NAME_ROW, c).trim() || 'ตัวชี้วัด ' + (i + 1);
   const SC_EDIT = [...SC[1].ind, SC[1].exam, ...SC[2].ind, SC[2].exam, SC.note];
   // ตัวชี้วัดที่ใช้งาน = ช่องที่กำหนดคะแนนเต็มไว้ (ช่องว่าง = ไม่ใช้/ซ่อน)
   const activeInds = (sc, T) => SC[T].ind.filter(c => get(sc, 4, c) !== null && get(sc, 4, c) !== '');
@@ -117,6 +129,7 @@
   }
   function refresh() { if (!L) return; const v = $('#view'); const top = v.scrollTop; renderTabbar(); render(); v.scrollTop = top; }
   function render() {
+    if (L) syncAbilities();
     const fn = { home: vHome, data: vData, scores: vScores, assess: vAssess, report: vReport, docs: vDocs }[U.tab];
     $('#view').innerHTML = `<div class="page">${fn()}</div>`;
     if (U.tab === 'report') afterReport();
@@ -146,8 +159,8 @@
     for (const s of subs) for (const st of stu) for (const c of [...scInputs(L.score(s.slot), 1), ...scInputs(L.score(s.slot), 2)]) { total++; const v = get(L.score(s.slot), stuScoreRow(st.r), c); if (v !== null && v !== '') filled++; }
     let af = 0, at = 0;
     for (const t of [1, 2]) for (const st of stu) {
-      for (let c = 3; c <= 10; c++) { at++; if (txt(L.trait(t), stuTraitRow(st.r), c)) af++; }
-      for (let c = 3; c <= 5; c++) { at++; if (txt(L.act(t), stuTraitRow(st.r), c)) af++; }
+      for (const c of activeItems('trait')) { at++; if (txt(L.trait(t), stuTraitRow(st.r), c)) af++; }
+      for (const c of activeItems('act')) { at++; if (txt(L.act(t), stuTraitRow(st.r), c)) af++; }
     }
     return { stu, subs, infoDone, abDone, sp: total ? filled / total : 0, ap: at ? af / at : 0 };
   }
@@ -239,8 +252,8 @@
       for (const c of [2, 3, 4]) setv(L.stu, r, c, null);
       for (const s of subjects()) for (const c of SC_EDIT) setv(L.score(s.slot), stuScoreRow(r), c, null);
       for (const t of [1, 2]) {
-        for (let c = 3; c <= 10; c++) setv(L.trait(t), stuTraitRow(r), c, null);
-        for (let c = 3; c <= 5; c++) setv(L.act(t), stuTraitRow(r), c, null);
+        for (let c = 3; c < 3 + AS.trait.max; c++) setv(L.trait(t), stuTraitRow(r), c, null);
+        for (let c = 3; c < 3 + AS.act.max; c++) setv(L.act(t), stuTraitRow(r), c, null);
       }
     });
     if (currentStudent() === nm) { const f = students()[0]; WB().setValue(L.sum, { r: 3, c: 2 }, f ? f.name : null); }
@@ -301,24 +314,43 @@
 
   // --- ความสามารถ
   function vAbilities() {
-    const subs = subjects();
-    return `<p class="sub">ความสามารถชั้นปีตามหลักสูตร 2568 — เลือกระดับที่คาดหวังของแต่ละข้อ (ใช้เปรียบเทียบพัฒนาการใน ปพ.6)</p>` + L.ab.map((r, i) => {
+    const subs = subjects(), n = L.ab.length;
+    return `<p class="sub">ความสามารถชั้นปีตามหลักสูตร 2568 — แก้ชื่อหัวข้อได้ เลือกระดับที่คาดหวัง (ใช้เปรียบเทียบพัฒนาการใน ปพ.6) · สูงสุด ${AB_MAX} ข้อ</p>` + L.ab.map((r, i) => {
       const exp = txt(L.sum, r, 2); const t = L.abText[i];
       const mine = subs.filter(s => s.ab === t);
       const br = L.behRow[i];
-      return `<div class="card"><div class="row" style="align-items:flex-start;flex-wrap:nowrap"><div class="badge">${i + 1}</div><div style="flex:1;min-width:0"><div>${esc(oneLine(t))}</div>
+      return `<div class="card"><div class="row" style="align-items:flex-start;flex-wrap:nowrap"><div class="badge">${i + 1}</div><div style="flex:1;min-width:0">
+        ${field('ชื่อความสามารถข้อ ' + (i + 1), inputFor(L.sum, 6 + i, 9, { area: true, rows: 2, after: 'abname' }))}
         <div class="chips" style="margin:6px 0">${mine.length ? mine.map(s => `<span class="chip">${esc(oneLine(s.name))}</span>`).join('') : '<span class="chip warn">ยังไม่มีวิชาในข้อนี้</span>'}</div></div></div>
         <div class="fld"><span>ระดับที่คาดหวัง</span><div class="seg" role="group">${LEVELS.map(l => `<button data-act="exp" data-i="${i}" data-v="${l}" class="${exp === l ? 'on' : ''}">${l}</button>`).join('')}</div></div>
         ${br ? `<details class="more"><summary>แก้คำอธิบายพฤติกรรมแต่ละระดับ</summary><div class="grid2" style="margin-top:8px">${LEVELS.map((l, k) => field(l, inputFor(L.beh, br, 2 + k, { area: true, rows: 3 }))).join('')}</div></details>` : ''}
       </div>`;
-    }).join('');
+    }).join('') + `<div class="card soft"><div class="row"><button class="btn primary" data-act="ab-add"${n >= AB_MAX ? ' disabled' : ''}>＋ เพิ่มความสามารถ</button><button class="btn danger" data-act="ab-del"${n <= 1 ? ' disabled' : ''}>－ ลดความสามารถ (ข้อสุดท้าย)</button><span class="hint">ใช้ ${n} / ${AB_MAX} ข้อ</span></div></div>`;
   }
-  function setExpected(i, lv) {
+  // แก้ชื่อความสามารถ: วิชาที่ผูกกับชื่อเดิมย้ายตามชื่อใหม่
+  function renameAbility(oldName, newName) {
+    if (!oldName || oldName === newName) return;
+    A().batch(() => { for (const s of subjects()) if (s.ab === oldName) setv(L.subj, s.r, 2, newName || null); });
+  }
+  function abAdd() {
+    const i = L.ab.length; if (i >= AB_MAX) return;
+    A().batch(() => { setv(L.sum, 6 + i, 9, 'ความสามารถข้อที่ ' + (i + 1) + ' (แก้ชื่อได้)'); if (!txt(L.sum, L.abAll[i], 2)) setExpected(i, 'เริ่มต้น', true); });
+    refresh();
+  }
+  async function abDel() {
+    const i = L.ab.length - 1; if (i < 1) return;
+    const name = abName(i), mine = subjects().filter(s => s.ab === name);
+    const ok = await uiModal({ title: 'ลดความสามารถ', body: `<p>ลบ <b>ความสามารถข้อ ${i + 1}</b>${mine.length ? ` และยกเลิกการผูกวิชา ${mine.map(s => esc(oneLine(s.name))).join(', ')}` : ''}?</p>`, ok: 'ลบ', danger: true });
+    if (!ok) return;
+    A().batch(() => { for (const s of mine) setv(L.subj, s.r, 2, null); setv(L.sum, 6 + i, 9, null); });
+    refresh();
+  }
+  function setExpected(i, lv, quiet) {
     A().batch(() => {
-      const r = L.ab[i]; setv(L.sum, r, 2, lv);
+      const r = L.abAll[i]; setv(L.sum, r, 2, lv);
       for (const t of [1, 2]) if (L.term[t]) setv(L.term[t], r, 2, lv);
     });
-    refresh();
+    if (!quiet) refresh();
   }
 
   // ---------------------------------------------------------------- คะแนน
@@ -345,11 +377,11 @@
     }
     const inds = activeInds(sc, T), mf = (c) => inputFor(sc, 4, c, { kind: 'n', mode: 'numeric', after: 'maxchg' });
     const maxBox = `<div class="card soft"><div class="hint" style="margin-bottom:6px">คะแนนเต็มรายตัวชี้วัด (คะแนนเก็บ = ผลรวมคะแนนตัวชี้วัด)</div>
-      <div class="maxbox">${inds.map((c, i) => field('ตัวชี้วัด ' + (i + 1) + ' เต็ม', mf(c))).join('')}
+      <div class="maxbox">${inds.map((c, i) => `<div class="indset"><b>ตัวชี้วัด ${i + 1}</b>${field('ชื่อ', inputFor(sc, IND_NAME_ROW, c, { after: 'rerender', ph: 'ตัวชี้วัด ' + (i + 1) }), 'wname')}${field('คะแนนเต็ม', mf(c))}</div>`).join('')}
       <div class="row indbtn"><button class="btn sm" data-act="ind-add"${inds.length >= NIND ? ' disabled' : ''}>＋ เพิ่มตัวชี้วัด</button><button class="btn sm" data-act="ind-del"${inds.length <= 1 ? ' disabled' : ''}>－ ลดตัวชี้วัด</button></div></div>
       <div class="maxbox" style="margin-top:10px"><span class="hint">คะแนนเก็บ เต็ม <b>${num(sc, 4, SC[T].keep) ?? 0}</b></span>${field('คะแนนสอบ เต็ม', mf(SC[T].exam))}<span class="hint">รวมเต็ม <b>${mxs(SC[T].tot)}</b></span></div></div>`;
     // คอลัมน์ที่กรอกได้ (เรียงตามตาราง): ตัวชี้วัด..., สอบ, หมายเหตุ
-    const head = `<tr><th class="no">ที่</th><th class="stk">ชื่อ - สกุล</th>${inds.map((c, i) => `<th>ตัวชี้วัด ${i + 1}<br><small>(${mxs(c)})</small></th>`).join('')}
+    const head = `<tr><th class="no">ที่</th><th class="stk">ชื่อ - สกุล</th>${inds.map((c, i) => `<th title="${esc(indLabel(sc, c, i))}">${esc(indLabel(sc, c, i))}<br><small>(${mxs(c)})</small></th>`).join('')}
       <th class="ro">เก็บ<br><small>(${mxs(SC[T].keep)})</small></th><th>สอบ<br><small>(${mxs(SC[T].exam)})</small></th><th class="ro">รวม<br><small>(${mxs(SC[T].tot)})</small></th><th class="ro">ระดับ</th><th class="wide">หมายเหตุ</th></tr>`;
     const body = stu.map((st, i) => {
       const r = stuScoreRow(st.r);
@@ -466,31 +498,46 @@
       const ok = await uiModal({ title: 'ลดตัวชี้วัด', body: `<p>ลบ <b>ตัวชี้วัด ${inds.length}</b> ของเทอม ${T} พร้อมคะแนนที่กรอกไว้ ${used} คน? ย้อนกลับไม่ได้</p>`, ok: 'ลบ', danger: true });
       if (!ok) return;
     }
-    A().batch(() => { for (const st of stu) setv(sc, stuScoreRow(st.r), c, null); setv(sc, 4, c, null); });
+    A().batch(() => { for (const st of stu) setv(sc, stuScoreRow(st.r), c, null); setv(sc, 4, c, null); setv(sc, IND_NAME_ROW, c, null); });
     refresh();
   }
   function vAssess() {
     const stu = students();
     if (!stu.length) return `<div class="card empty"><b>ยังไม่มีนักเรียน</b><br><button class="btn primary" data-act="goto" data-to="data:students">ไปเพิ่มนักเรียน</button></div>`;
     const t = U.aTerm, kind = U.kind;
-    const sheet = kind === 'trait' ? L.trait(t) : L.act(t);
-    const c0 = 3, c1 = kind === 'trait' ? 10 : 5, kc = c1 + 1;
-    const heads = []; for (let c = c0; c <= c1; c++) heads.push(c);
+    const sheet = asSheet(kind, t), kc = AS[kind].sum, heads = activeItems(kind);
+    const names = `<div class="card soft"><div class="hint" style="margin-bottom:6px">ชื่อหัวข้อ${kind === 'trait' ? 'คุณลักษณะ' : 'กิจกรรม'} (ใช้ทั้งเทอม 1 และเทอม 2) · สูงสุด ${AS[kind].max} หัวข้อ</div>
+      <div class="maxbox">${heads.map((c, i) => field('หัวข้อ ' + (i + 1), inputFor(asSheet(kind, 1), 3, c, { after: 'rerender' }), 'wname')).join('')}
+      <div class="row indbtn"><button class="btn sm" data-act="as-add"${heads.length >= AS[kind].max ? ' disabled' : ''}>＋ เพิ่มหัวข้อ</button><button class="btn sm" data-act="as-del"${heads.length <= 1 ? ' disabled' : ''}>－ ลดหัวข้อ</button></div></div></div>`;
     const head = `<tr><th class="no">ที่</th><th class="stk">ชื่อ - สกุล</th>${heads.map(c => `<th data-act="acol" data-c="${c}" title="แตะเพื่อตั้งทั้งห้องเป็น ผ่าน">${esc(oneLine(txt(sheet, 3, c)))}</th>`).join('')}<th class="ro" style="min-width:70px;cursor:default">สรุป</th></tr>`;
     const body = stu.map((st, i) => {
       const r = stuTraitRow(st.r);
       return `<tr><td class="no">${esc(st.no)}</td><td class="stk">${esc(st.name)}</td>${heads.map((c, j) => gcell(sheet, r, c, 'pass', i, j)).join('')}${rocell(sheet, r, kc, 'pass')}</tr>`;
     }).join('');
-    return `<div class="bar">${seg([['trait', 'คุณลักษณะอันพึงประสงค์'], ['act', 'กิจกรรมพัฒนาผู้เรียน']], kind, 'akind')}${seg([[1, 'เทอม 1'], [2, 'เทอม 2']], t, 'aterm')}</div>
+    return `<div class="bar">${seg([['trait', 'คุณลักษณะอันพึงประสงค์'], ['act', 'กิจกรรมพัฒนาผู้เรียน']], kind, 'akind')}${seg([[1, 'เทอม 1'], [2, 'เทอม 2']], t, 'aterm')}</div>${names}
       <p class="sub">ใช้งานเหมือนชีท Excel: พิมพ์ <b>ผ่าน</b> / <b>ไม่ผ่าน</b> (หรือ 1 / 0, ✓ / ✗) · Space สลับค่า · ดับเบิลคลิกเพื่อสลับ · วางหลายช่องจาก Excel ได้ · แตะหัวคอลัมน์เพื่อตั้งทั้งห้องเป็น “ผ่าน”</p>
       <div class="bar"><button class="btn" data-act="aall" data-v="ผ่าน">ตั้งทั้งหมดเป็น “ผ่าน”</button><button class="btn danger" data-act="aall" data-v="">ล้างทั้งหมด</button></div>
       ${gridWrap('assess', head, body)}`;
   }
+  function asAdd() {
+    const kind = U.kind, used = activeItems(kind);
+    const c = range(3, AS[kind].max).find(x => !used.includes(x)); if (!c) return;
+    setv(asSheet(kind, 1), 3, c, 'หัวข้อใหม่'); refresh();
+  }
+  async function asDel() {
+    const kind = U.kind, used = activeItems(kind); if (used.length <= 1) return;
+    const c = used[used.length - 1], stu = students();
+    const filled = [1, 2].reduce((n, t) => n + stu.filter(st => txt(asSheet(kind, t), stuTraitRow(st.r), c)).length, 0);
+    const ok = await uiModal({ title: 'ลดหัวข้อ', body: `<p>ลบหัวข้อ <b>${esc(oneLine(txt(asSheet(kind, 1), 3, c)))}</b>${filled ? ` พร้อมผลประเมินที่บันทึกไว้ ${filled} ช่อง (ทั้ง 2 เทอม)` : ''}?</p>`, ok: 'ลบ', danger: true });
+    if (!ok) return;
+    A().batch(() => { for (const t of [1, 2]) for (const st of stu) setv(asSheet(kind, t), stuTraitRow(st.r), c, null); setv(asSheet(kind, 1), 3, c, null); });
+    refresh();
+  }
   const passChip = (v) => v ? `<span class="pass ${v === 'ผ่าน' ? 'ok' : 'no'}">${esc(v)}</span>` : '<span class="hint">–</span>';
   function assessSheet() { return U.kind === 'trait' ? L.trait(U.aTerm) : L.act(U.aTerm); }
   function setAssessAll(v, col) {
-    const sheet = assessSheet(); const c1 = U.kind === 'trait' ? 10 : 5;
-    A().batch(() => { for (const st of students()) for (let c = col || 3; c <= (col || c1); c++) setv(sheet, stuTraitRow(st.r), c, v === '' ? null : v); });
+    const sheet = assessSheet(); const cols = col ? [col] : activeItems(U.kind);
+    A().batch(() => { for (const st of students()) for (const c of cols) setv(sheet, stuTraitRow(st.r), c, v === '' ? null : v); });
     refresh();
   }
 
@@ -507,7 +554,7 @@
   function passFor(st, which) {
     const ts = which === 'sum' ? [1, 2] : [which];
     const res = {};
-    for (const [k, getSheet, kc] of [['trait', L.trait, 11], ['act', L.act, 6]]) {
+    for (const [k, getSheet, kc] of [['trait', L.trait, AS.trait.sum], ['act', L.act, AS.act.sum]]) {
       const vals = ts.map(t => txt(getSheet(t), stuTraitRow(st.r), kc));
       res[k] = vals.every(v => v === 'ผ่าน') ? 'ผ่าน' : vals.some(v => v === 'ไม่ผ่าน') ? 'ไม่ผ่าน' : '';
     }
@@ -592,6 +639,10 @@
       case 'sub-del': delSubject(+b.dataset.r); break;
       case 'exp': setExpected(+b.dataset.i, b.dataset.v); break;
       case 'ind-add': indAdd(); break;
+      case 'ab-add': abAdd(); break;
+      case 'ab-del': abDel(); break;
+      case 'as-add': asAdd(); break;
+      case 'as-del': asDel(); break;
       case 'ind-del': indDel(); break;
       case 'sterm': U.scoreTerm = b.dataset.k === 'y' ? 'y' : +b.dataset.k; refresh(); break;
       case 'subj-step': { const subs = subjects(); const i = subs.findIndex(s => s.r === curSubject().r) + (+b.dataset.d); if (subs[i]) { U.slot = subs[i].r; refresh(); } break; }
@@ -637,14 +688,18 @@
     if (err) { A().toast(err, 'warn'); el.classList.add('bad'); revert(); return; }
     el.classList.remove('bad');
     const wasCur = sheet === L.stu && c === 2 && el.dataset.old && el.dataset.old === currentStudent();
+    const oldVal = el.dataset.old || '';
+    if (el.dataset.after === 'abname' && val === null) { A().toast('ชื่อความสามารถว่างไม่ได้ (ถ้าต้องการลบ ใช้ปุ่ม “ลดความสามารถ”)', 'warn'); revert(); return; }
     if (!setv(sheet, r, c, val)) { revert(); return; }
     if (val !== null && (el.dataset.t === 'sex' || el.dataset.t === 'pass')) el.value = val;
     el.dataset.old = el.value;
     if (el.dataset.t === 'pass') { el.classList.toggle('ok', val === 'ผ่าน'); el.classList.toggle('no', val === 'ไม่ผ่าน'); }
     const af = el.dataset.after;
     if (af === 'grid') updateRo(el.closest('table'));
-    else if (af === 'rerender') refresh();
-    else if (af === 'maxchg') refresh();
+    // วาดหน้าใหม่หลังจบเหตุการณ์ change (กันวาดซ้อนตอนช่องที่โฟกัสอยู่ถูกลบแล้วเกิด blur)
+    else if (af === 'rerender') setTimeout(refresh, 0);
+    else if (af === 'abname') { renameAbility(oldVal, String(val)); setTimeout(refresh, 0); }
+    else if (af === 'maxchg') setTimeout(refresh, 0);
     else if (af === 'sub') U.pendSub.delete(r);
     else if (af === 'stu') {
       if (val !== null && wasCur) WB().setValue(L.sum, { r: 3, c: 2 }, val);

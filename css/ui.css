@@ -103,11 +103,17 @@ details.more>summary{cursor:pointer;color:var(--brand);font-size:.92rem;padding:
 .maxbox{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
 .maxbox .fld{width:8.2rem}
 .indbtn{gap:8px;align-self:flex-end}
+.maxbox .fld.wname{width:14rem}
+.indset{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;padding:8px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.indset>b{align-self:center;font-size:.9rem;min-width:5.2rem}
 /* มือถือ/แท็บเล็ต: ตารางยาวตามหน้า (เลื่อนทั้งหน้า) และช่องคะแนนเต็มกระชับ 3 ช่องต่อแถว */
 @media (max-width:899px){
   .tw{max-height:none}
   .maxbox{gap:8px}
   .maxbox .fld{width:calc(33.33% - 6px);min-width:88px}
+  .maxbox .fld.wname{width:100%}
+  .indset{width:100%}
+  .indset .fld{flex:1}
   .maxbox .fld>span{font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .card{padding:12px}
 }

@@ -38,6 +38,12 @@
       for (let r = 6; r <= 29; r++) { const v = wb.get(src, r, 5); m.set(r, String(v === null ? '' : v).trim().length === 0); }
       for (let r = 37; r <= 39; r++) m.set(r, noDeputy);
     }
+    // หน้าคำอธิบายพฤติกรรม: ซ่อนแถวของความสามารถที่ไม่ใช้ (ชื่อว่างใน ปพ.6 รวม!I6:I13)
+    for (const nm of [names.sumBeh, names.termBeh[1], names.termBeh[2]]) {
+      if (!nm) continue;
+      let m = view.rowHidden[nm]; if (!m) { m = new Map(); view.rowHidden[nm] = m; }
+      for (let i = 0; i < 8; i++) { const v = wb.get(src, 6 + i, 9); m.set(4 + i, String(v === null ? '' : v).trim().length === 0); }
+    }
   }
 
   function setBg(view, sheet, ref, color) { (view.bg[sheet] = view.bg[sheet] || {})[ref] = color; }
@@ -90,6 +96,8 @@
     const { wb, names, toast } = ctx;
     // ข้อมูลพื้นฐาน!B7 -> ซ่อน/แสดงลายเซ็นรอง ผอ.
     if (sheetName === names.info && r === 7 && c === 2) hideReportRows(ctx);
+    // ชื่อความสามารถ (ปพ.6 รวม!I6:I13) -> ซ่อน/แสดงแถวในหน้าคำอธิบายพฤติกรรม
+    if (sheetName === names.sum && c === 9 && r >= 6 && r <= 13) hideReportRows(ctx);
     // ข้อมูลวิชา คอลัมน์ A:C
     if (sheetName === names.subj && c >= 1 && c <= 3) {
       if (c === 3) {
