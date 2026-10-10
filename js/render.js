@@ -50,6 +50,19 @@
     return String(v);
   }
 
+  let _cv = null;
+  function textW(txt, st) {
+    const f = st ? st.f : null, px = ((f && f[1]) || 16) * 4 / 3;
+    try {
+      if (typeof document !== 'undefined') {
+        _cv = _cv || document.createElement('canvas').getContext('2d');
+        _cv.font = `${f && f[2] ? 'bold ' : ''}${px}px ${FONT_STACK}`;
+        return _cv.measureText(txt).width;
+      }
+    } catch (e) { /* ใช้ค่าประมาณ */ }
+    return String(txt).length * px * 0.5;
+  }
+
   function parseRange(s) {
     const m = /^\$?([A-Z]+)\$?(\d+)(?::\$?([A-Z]+)\$?(\d+))?$/.exec(s.replace(/^.*!/, '').replace(/'/g, ''));
     if (!m) return null;
@@ -80,7 +93,21 @@
       if (ov && ov.has(r)) return ov.get(r);
       const x = d.rh[r]; return !!(x && x.x);
     };
-    const colW = (c) => { const w = (d.cw[c] && d.cw[c].w) || d.dcw; return Math.max(0, Math.round(w * 7 + 5)); };
+    // ขยายคอลัมน์ให้ข้อความที่ไม่ตัดบรรทัด (เช่น ชื่อวิชา) แสดงครบ
+    const extraW = {};
+    for (const ft of (d.fit || [])) {
+      const a = parseRange(ft.ref); if (!a) continue;
+      let need = 0;
+      for (let r = a.r1; r <= a.r2; r++) for (let c = a.c1; c <= a.c2; c++) {
+        let v = wb.get(sh, r, c); if (v && v.isRange) v = wb.scalar(v);
+        if (typeof v !== 'string' || !v) continue;
+        const cell = sh.cells.get(P.KEY(r, c));
+        need = Math.max(need, textW(v.replace(/\s*\n\s*/g, ' '), cell ? styles[cell.s] : null) + 12);
+      }
+      let have = 0; for (const c of ft.cols) have += Math.round(((d.cw[c] && d.cw[c].w) || d.dcw) * 7 + 5);
+      if (need > have) for (const c of ft.cols) extraW[c] = (extraW[c] || 0) + (need - have) / ft.cols.length;
+    }
+    const colW = (c) => { const w = (d.cw[c] && d.cw[c].w) || d.dcw; return Math.max(0, Math.round(w * 7 + 5 + (extraW[c] || 0))); };
     const rowH = (r) => { const x = d.rh[r]; const h = (x && x.h) || d.drh; return Math.round(h * 4 / 3); };
     // ตำแหน่งเริ่มของแต่ละคอลัมน์/แถว (พิกเซล) ใช้วางรูปทรงและตราโรงเรียนทับตาราง
     const colX = {}, rowY = {}; let accX = 0, accY = 0;
@@ -134,7 +161,8 @@
           if ((nx === null || nx === '') && !covered.has(P.KEY(r, nc)) && !anchors.has(P.KEY(r, nc))) sp.push('overflow:visible');
         }
         const style = sp.length ? ` style="${sp.join(';')}"` : '';
-        const txt = fmtValue(v, st);
+        let txt = fmtValue(v, st);
+        if (st && !st.a[2] && txt.indexOf('\n') >= 0) txt = txt.replace(/\s*\n\s*/g, ' ');   // Excel ไม่ตัดบรรทัดถ้าไม่ได้เปิด wrap
         const rot = st && (st.a[4] === 90 || st.a[4] === 180 || st.a[4] === 255);
         const body = rot ? `<span class="rot">${esc(txt)}</span>` : esc(txt);
         const num = typeof v === 'number';
@@ -152,10 +180,17 @@
     let over = '';
     // รูปทรงที่วางทับเซลล์ (เช่น ช่องสี่เหลี่ยมติ๊กถูก)
     for (const g of (d.shapes || [])) {
-      const [fc, fco, fr, fro] = g.from, [tc, tco, tr, tro] = g.to;
-      if (fc + 1 < c1 || tc + 1 > c2 + 1 || fr + 1 < r1 || tr + 1 > r2 + 1) continue;
-      const l = X(fc + 1) + fco / 9525, t = Y(fr + 1) + fro / 9525;
-      const w = X(tc + 1) + tco / 9525 - l, h = Y(tr + 1) + tro / 9525 - t;
+      let l, t, w, h;
+      if (g.rel) {   // วางชิดซ้ายของเซลล์ที่กำหนด กึ่งกลางแนวตั้งของแถว (เช่น ช่องติ๊ก อนุมัติ/ไม่อนุมัติ)
+        const a = parseRange(g.rel.cell); if (!a || a.c1 < c1 || a.c1 > c2 || a.r1 < r1 || a.r1 > r2) continue;
+        w = g.rel.w; h = g.rel.h;
+        l = X(a.c1) + g.rel.dx - w; t = Y(a.r1) + (Y(a.r1 + 1) - Y(a.r1) - h) / 2;
+      } else {
+        const [fc, fco, fr, fro] = g.from, [tc, tco, tr, tro] = g.to;
+        if (fc + 1 < c1 || tc + 1 > c2 + 1 || fr + 1 < r1 || tr + 1 > r2 + 1) continue;
+        l = X(fc + 1) + fco / 9525; t = Y(fr + 1) + fro / 9525;
+        w = X(tc + 1) + tco / 9525 - l; h = Y(tr + 1) + tro / 9525 - t;
+      }
       if (w <= 0 || h <= 0) continue;
       over += `<div class="xlshape" style="position:absolute;box-sizing:border-box;pointer-events:none;left:${l.toFixed(1)}px;top:${t.toFixed(1)}px;width:${w.toFixed(1)}px;height:${h.toFixed(1)}px;${g.fill ? 'background:' + g.fill + ';' : ''}${g.line ? 'border:' + g.lw + 'px solid ' + g.line + ';' : ''}${g.g === 'ellipse' ? 'border-radius:50%;' : g.g === 'roundRect' ? 'border-radius:8px;' : ''}"></div>`;
     }
