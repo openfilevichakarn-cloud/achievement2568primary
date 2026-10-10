@@ -99,11 +99,13 @@ details.more>summary{cursor:pointer;color:var(--brand);font-size:.92rem;padding:
 .srows{display:grid;gap:8px}
 .srow{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center}
 .srow .sname{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis}
-.srow .inps{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.srow .inps{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .srow .inps label{display:block}
 .srow .inps label span{display:block;font-size:.8rem;color:var(--muted)}
 .srow .inps input{width:100%;min-height:46px;font-size:18px;text-align:center;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
 .srow .inps input:focus{outline:2px solid var(--brand);background:var(--panel)}
+.srow .inps input:disabled{opacity:.6;cursor:not-allowed}
+.srow .inps input:disabled::placeholder{font-size:12px}
 .srow .tot{text-align:right;white-space:nowrap}
 .srow .tot b{font-size:1.15rem}
 .srow .res{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -111,7 +113,7 @@ details.more>summary{cursor:pointer;color:var(--brand);font-size:.92rem;padding:
 .srow.yr .inps{grid-template-columns:repeat(3,1fr)}
 .ro{display:block;text-align:center;min-height:46px;line-height:46px;border-radius:10px;background:var(--soft);font-size:18px}
 @media (min-width:760px){
-  .srow{grid-template-columns:44px minmax(150px,1.2fr) minmax(220px,1fr) 130px 120px;padding:8px 12px}
+  .srow{grid-template-columns:44px minmax(150px,1.2fr) minmax(300px,1.4fr) 130px 120px;padding:8px 12px}
   .srow .inps{grid-column:auto}
   .srow .res{grid-column:auto;display:contents}
   .srow .note{grid-column:2/-1}

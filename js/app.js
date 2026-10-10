@@ -73,7 +73,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ป.' + g + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261010d');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261010e');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -111,8 +111,32 @@
 
   function ctx() { return { wb: S.wb, view: S.view, names: S.names, toast }; }
 
+  // ข้อมูลที่บันทึกก่อนเพิ่มช่อง "คะแนนรายตัวชี้วัด" (v1): เลื่อนคอลัมน์ชีทคะแนนรายวิชาให้ตรงผังใหม่
+  // และตั้งคะแนนเต็มตัวชี้วัดเป็น 0 เพื่อให้ผลคะแนน/ระดับเดิมไม่เปลี่ยน (ครูปรับคะแนนเต็มเองได้ภายหลัง)
+  function migrateDoc(doc) {
+    if (!doc || !doc.cells || (doc.v || 1) >= 2) return doc;
+    const OLD_MAX = { D4: 35, E4: 15, H4: 35, I4: 15 };   // คะแนนเต็มค่าเริ่มต้นของไฟล์เดิม
+    for (const [sheet, m] of Object.entries(doc.cells)) {
+      if (!/^คะแนนรายวิชา \d+$/.test(sheet)) continue;
+      const out = {};
+      for (const [ref, val] of Object.entries(m)) {
+        const a = /^([A-Z]+)(\d+)$/.exec(ref); if (!a) continue;
+        const c = P.colToNum(a[1]);
+        out[P.numToCol(c <= 2 ? c : c <= 5 ? c + 1 : c + 2) + a[2]] = val;
+      }
+      if (Object.keys(out).length) {
+        out.C4 = 0; out.G4 = 0;
+        for (const [k, v] of Object.entries(OLD_MAX)) if (!(k in out)) out[k] = v;
+      }
+      doc.cells[sheet] = out;
+    }
+    doc.v = 2;
+    return doc;
+  }
+
   function applyDoc(doc) {
     const wb = S.wb;
+    doc = migrateDoc(doc);
     if (doc && doc.cells) {
       for (const [sheet, m] of Object.entries(doc.cells)) {
         if (!wb.sheet(sheet)) continue;
@@ -292,7 +316,7 @@
   }
 
   // ---------------------------------------------------------------- save
-  function buildDoc() { return { v: 1, grade: S.grade, cells: S.userEdits, logo: S.view.logo || null, active: S.active, savedAt: new Date().toISOString() }; }
+  function buildDoc() { return { v: 2, grade: S.grade, cells: S.userEdits, logo: S.view.logo || null, active: S.active, savedAt: new Date().toISOString() }; }
   function markDirty() {
     if (S.batch) { S.pendingDirty = true; S.dirty = true; return; }
     S.dirty = true; setStatus('มีการแก้ไข... (จะบันทึกอัตโนมัติ)', 'dirty');

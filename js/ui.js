@@ -51,6 +51,13 @@
   }
 
   const stuScoreRow = (r) => r + 3, stuTraitRow = (r) => r + 1;
+  // ชีทคะแนนรายวิชา: [ตัวชี้วัด, เก็บ, สอบ] / รวม / ระดับ ของแต่ละเทอม
+  const SC = { 1: { inp: [3, 4, 5], tot: 6, lvl: 12 }, 2: { inp: [7, 8, 9], tot: 10, lvl: 13 }, year: 11, yearLvl: 14, note: 15 };
+  const SC_LABEL = ['คะแนนรายตัวชี้วัด', 'คะแนนเก็บ', 'คะแนนสอบ'];
+  const SC_SHORT = ['ตัวชี้วัด', 'เก็บ', 'สอบ'];
+  const SC_EDIT = [...SC[1].inp, ...SC[2].inp, SC.note];
+  // ช่องที่ต้องกรอก = ช่องที่คะแนนเต็มมากกว่า 0
+  const scInputs = (sc, T) => SC[T].inp.filter(c => (num(sc, 4, c) ?? 0) > 0);
   function students() {
     const out = [];
     for (let r = L.stuFirst; r <= L.stuLast; r++) {
@@ -128,7 +135,7 @@
     const infoDone = needInfo.every(r => { const v = get(info, r, 2); return v !== null && !isPh(v) && String(v).trim() !== ''; });
     const abDone = subs.length > 0 && subs.every(s => s.ab);
     let filled = 0, total = 0;
-    for (const s of subs) for (const st of stu) for (const c of [3, 4, 6, 7]) { total++; const v = get(L.score(s.slot), stuScoreRow(st.r), c); if (v !== null && v !== '') filled++; }
+    for (const s of subs) for (const st of stu) for (const c of [...scInputs(L.score(s.slot), 1), ...scInputs(L.score(s.slot), 2)]) { total++; const v = get(L.score(s.slot), stuScoreRow(st.r), c); if (v !== null && v !== '') filled++; }
     let af = 0, at = 0;
     for (const t of [1, 2]) for (const st of stu) {
       for (let c = 3; c <= 10; c++) { at++; if (txt(L.trait(t), stuTraitRow(st.r), c)) af++; }
@@ -146,7 +153,7 @@
       ${step(1, 'ตั้งค่าโรงเรียน', p.infoDone ? 'กรอกชื่อครูและผู้อำนวยการแล้ว' : 'กรอกชื่อครูประจำชั้น ผู้อำนวยการ และตราโรงเรียน', p.infoDone, 'data:school')}
       ${step(2, 'รายชื่อนักเรียน', p.stu.length ? p.stu.length + ' คน' : 'เพิ่มนักเรียน หรือวางรายชื่อจาก Excel ทีเดียว', p.stu.length > 0, 'data:students')}
       ${step(3, 'รายวิชาและความสามารถ', p.subs.length ? p.subs.length + ' วิชา' + (p.abDone ? '' : ' (บางวิชายังไม่เลือกความสามารถ)') : 'เพิ่มวิชา แล้วเลือกว่าวิชาไหนอยู่ในความสามารถข้อใด', p.subs.length > 0 && p.abDone, 'data:subjects')}
-      ${step(4, 'บันทึกคะแนน', 'เลือกวิชาแล้วกรอกคะแนนเก็บ/สอบ ทีละเทอม', p.sp >= 0.999, 'scores', p.sp)}
+      ${step(4, 'บันทึกคะแนน', 'เลือกวิชาแล้วกรอกคะแนนตัวชี้วัด/เก็บ/สอบ ทีละเทอม', p.sp >= 0.999, 'scores', p.sp)}
       ${step(5, 'ประเมินคุณลักษณะและกิจกรรม', 'แตะช่องเพื่อเลือก ผ่าน / ไม่ผ่าน', p.ap >= 0.999, 'assess', p.ap)}
       ${step(6, 'ดูรายงานและพิมพ์ ปพ.6', 'ผลรายคน ภาพรวมห้อง และพิมพ์ทั้งห้อง', false, 'report')}
     </div>
@@ -261,7 +268,7 @@
     }
     A().batch(() => {
       for (const c of [2, 3, 4]) setv(L.stu, r, c, null);
-      for (const s of subjects()) for (const c of [3, 4, 6, 7, 13]) setv(L.score(s.slot), stuScoreRow(r), c, null);
+      for (const s of subjects()) for (const c of SC_EDIT) setv(L.score(s.slot), stuScoreRow(r), c, null);
       for (const t of [1, 2]) {
         for (let c = 3; c <= 10; c++) setv(L.trait(t), stuTraitRow(r), c, null);
         for (let c = 3; c <= 5; c++) setv(L.act(t), stuTraitRow(r), c, null);
@@ -316,7 +323,7 @@
     }
     A().batch(() => {
       const slot = r - 1;
-      for (const st of students()) for (const c of [3, 4, 6, 7, 13]) setv(L.score(slot), stuScoreRow(st.r), c, null);
+      for (const st of students()) for (const c of SC_EDIT) setv(L.score(slot), stuScoreRow(st.r), c, null);
       for (const c of [2, 4, 5, 6]) setv(L.sub, r + 3, c, null);
       setv(L.subj, r, 2, null); setv(L.subj, r, 1, null);
     });
@@ -363,30 +370,30 @@
       <button class="btn" data-act="subj-step" data-d="1" aria-label="วิชาถัดไป"${idx === subs.length - 1 ? ' disabled' : ''}>›</button></div>`;
     const termSeg = `<div class="bar" style="margin-top:10px">${seg([[1, 'เทอม 1'], [2, 'เทอม 2'], ['y', 'สรุปทั้งปี']], T, 'sterm')}</div>`;
     let maxBox = '';
-    if (T === 1) maxBox = `<div class="card soft"><div class="maxbox">${field('คะแนนเก็บ เต็ม', inputFor(sc, 4, 3, { kind: 'n', mode: 'numeric', after: 'maxchg' }))}${field('คะแนนสอบ เต็ม', inputFor(sc, 4, 4, { kind: 'n', mode: 'numeric', after: 'maxchg' }))}<span class="hint">รวมเต็ม <b id="maxsum">${num(sc, 4, 5) ?? ''}</b></span></div></div>`;
-    else if (T === 2) maxBox = `<div class="card soft"><div class="maxbox">${field('คะแนนเก็บ เต็ม', inputFor(sc, 4, 6, { kind: 'n', mode: 'numeric', after: 'maxchg' }))}${field('คะแนนสอบ เต็ม', inputFor(sc, 4, 7, { kind: 'n', mode: 'numeric', after: 'maxchg' }))}<span class="hint">รวมเต็ม <b id="maxsum">${num(sc, 4, 8) ?? ''}</b></span></div></div>`;
-    else maxBox = `<div class="card soft"><span class="hint">คะแนนเต็มทั้งปี <b>${num(sc, 4, 9) ?? ''}</b> (เทอม 1 + เทอม 2) — ระดับคำนวณจากคะแนนรวมทั้งปี ตามเกณฑ์ ร้อยละ 75 / 65 / 55</span></div>`;
+    if (T !== 'y') maxBox = `<div class="card soft"><div class="maxbox">${SC[T].inp.map((c, i) => field(SC_LABEL[i] + ' เต็ม', inputFor(sc, 4, c, { kind: 'n', mode: 'numeric', after: 'maxchg' }))).join('')}<span class="hint">รวมเต็ม <b id="maxsum">${num(sc, 4, SC[T].tot) ?? ''}</b></span></div></div>`;
+    else maxBox = `<div class="card soft"><span class="hint">คะแนนเต็มทั้งปี <b>${num(sc, 4, SC.year) ?? ''}</b> (เทอม 1 + เทอม 2) — ระดับคำนวณจากคะแนนรวมทั้งปี ตามเกณฑ์ ร้อยละ 75 / 65 / 55</span></div>`;
     const rows = stu.map(st => scoreRow(sc, st, T)).join('');
-    let filled = 0; if (T !== 'y') for (const st of stu) for (const c of (T === 1 ? [3, 4] : [6, 7])) if (get(sc, stuScoreRow(st.r), c) !== null) filled++;
-    const prog = T === 'y' ? '' : `<div class="hint" style="margin:0 0 8px">กรอกแล้ว <b id="fillcnt">${filled}</b> / ${stu.length * 2} ช่อง</div>`;
+    const need = T === 'y' ? [] : scInputs(sc, T);
+    let filled = 0; for (const st of stu) for (const c of need) if (get(sc, stuScoreRow(st.r), c) !== null) filled++;
+    const prog = T === 'y' ? '' : `<div class="hint" style="margin:0 0 8px">กรอกแล้ว <b id="fillcnt">${filled}</b> / ${stu.length * need.length} ช่อง</div>`;
     return `${pickBar}${termSeg}${maxBox}${prog}<div class="srows" id="srows">${rows}</div>`;
   }
   function scoreRow(sc, st, T) {
     const r = stuScoreRow(st.r);
     const nameHtml = `<div class="badge">${esc(st.no)}</div><div class="sname">${esc(st.name)}</div>`;
     if (T === 'y') {
-      const e = num(sc, r, 5), h = num(sc, r, 8), i = num(sc, r, 9);
-      return `<div class="srow yr" data-row="${st.r}">${nameHtml}<div class="inps"><span class="ro">${e ?? '–'}</span><span class="ro">${h ?? '–'}</span><span class="ro"><b>${i ?? '–'}</b></span></div><div class="res">${lvChip(txt(sc, r, 12))}</div></div>`;
+      const e = num(sc, r, SC[1].tot), h = num(sc, r, SC[2].tot), i = num(sc, r, SC.year);
+      return `<div class="srow yr" data-row="${st.r}">${nameHtml}<div class="inps"><span class="ro">${e ?? '–'}</span><span class="ro">${h ?? '–'}</span><span class="ro"><b>${i ?? '–'}</b></span></div><div class="res">${lvChip(txt(sc, r, SC.yearLvl))}</div></div>`;
     }
-    const c1 = T === 1 ? 3 : 6, c2 = T === 1 ? 4 : 7, tc = T === 1 ? 5 : 8, lc = T === 1 ? 10 : 11;
-    const mk = (c, lab) => `<label><span>${lab}</span><input type="text" inputmode="numeric" enterkeyhint="next" ${bind(sc, r, c, 'n', ` data-old="${esc(get(sc, r, c) ?? '')}" data-after="row" data-col="${c}"`)} value="${esc(get(sc, r, c) ?? '')}" placeholder="–" autocomplete="off"></label>`;
+    const tc = SC[T].tot, lc = SC[T].lvl;
+    const mk = (c, lab) => `<label><span>${lab}</span><input type="text" inputmode="numeric" enterkeyhint="next" ${bind(sc, r, c, 'n', ` data-old="${esc(get(sc, r, c) ?? '')}" data-after="row" data-col="${c}"`)} value="${esc(get(sc, r, c) ?? '')}" autocomplete="off"${(num(sc, 4, c) ?? 0) > 0 ? ' placeholder="–"' : ' placeholder="ตั้งคะแนนเต็มก่อน" disabled'}></label>`;
     const tot = num(sc, r, tc), max = num(sc, 4, tc);
-    const note = txt(sc, r, 13), noteOpen = U.openNote.has(st.r) || note;
+    const note = txt(sc, r, SC.note), noteOpen = U.openNote.has(st.r) || note;
     return `<div class="srow" data-row="${st.r}" data-sc="${esc(sc)}" data-tc="${tc}" data-lc="${lc}">${nameHtml}
       <div class="tot"><b data-role="tot">${tot ?? '–'}</b><span class="hint"> / ${max ?? ''}</span></div>
-      <div class="inps">${mk(c1, 'คะแนนเก็บ')}${mk(c2, 'คะแนนสอบ')}</div>
+      <div class="inps">${SC[T].inp.map((c, i) => mk(c, SC_SHORT[i])).join('')}</div>
       <div class="res"><span data-role="lvl">${lvChip(txt(sc, r, lc))}</span><button class="btn sm ghost" data-act="note" data-r="${st.r}">${note ? '📝 หมายเหตุ' : '＋ หมายเหตุ'}</button></div>
-      ${noteOpen ? `<div class="note"><input class="in" ${bind(sc, r, 13, 't', ` data-old="${esc(note)}"`)} type="text" value="${esc(note)}" placeholder="หมายเหตุ"></div>` : ''}</div>`;
+      ${noteOpen ? `<div class="note"><input class="in" ${bind(sc, r, SC.note, 't', ` data-old="${esc(note)}"`)} type="text" value="${esc(note)}" placeholder="หมายเหตุ"></div>` : ''}</div>`;
   }
   function updateScoreRow(row) {
     if (!row || !row.dataset.sc) return;
@@ -394,11 +401,8 @@
     const tot = num(sc, r, tc); $('[data-role=tot]', row).textContent = tot ?? '–';
     $('.tot .hint', row).textContent = ' / ' + (num(sc, 4, tc) ?? '');
     $('[data-role=lvl]', row).innerHTML = lvChip(txt(sc, r, lc));
-    const f = $('#fillcnt'); if (f) f.textContent = $$('#srows input[data-col]').filter(i => i.value !== '').length;
-  }
-  function updateAllScoreRows() {
-    $$('#srows .srow').forEach(updateScoreRow);
-    const ms = $('#maxsum'); if (ms) { const row = $('#srows .srow'); if (row) ms.textContent = num(row.dataset.sc, 4, +row.dataset.tc) ?? ''; }
+    const need = new Set(scInputs(sc, tc === SC[1].tot ? 1 : 2));
+    const f = $('#fillcnt'); if (f) f.textContent = $$('#srows input[data-col]').filter(i => i.value !== '' && need.has(+i.dataset.col)).length;
   }
   function onKey(e) {
     if (e.key !== 'Enter') return;
@@ -596,7 +600,7 @@
     const af = el.dataset.after;
     if (af === 'row') updateScoreRow(el.closest('.srow'));
     else if (af === 'rerender') refresh();
-    else if (af === 'maxchg') updateAllScoreRows();
+    else if (af === 'maxchg') refresh();
     else if (af === 'sub') U.pendSub.delete(r);
     else if (af === 'stu') {
       U.pendStu.delete(r);
