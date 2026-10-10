@@ -33,3 +33,25 @@ for s in d['sheets']:
         if k.endswith('2') and re.fullmatch(r'[B-Z]2', k) and 'ครูประจำชั้น' in (c.get('f') or ''):
             c['s'] = wrap(c['s']); s['rh']['2'] = {'h': 36.0, 'x': 0}
 json.dump(d, open(path, 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
+
+# ชีทคะแนนรายวิชา: หัวกระดาษ 3 แถวแรก (ชื่อแบบ / วิชา / ชั้น-ครู-โรงเรียน) ไม่มีเส้นตาราง ตารางเริ่มเส้นบนที่แถว 4
+d = json.load(open(path, encoding='utf-8')); st = d['styles']; nob = {}; top = {}
+def no_border(i):
+    if i not in nob:
+        s = copy.deepcopy(st[i]); s['b'] = [None, None, None, None]; st.append(s); nob[i] = len(st) - 1
+    return nob[i]
+def colnum(s):
+    n = 0
+    for ch in s: n = n * 26 + ord(ch) - 64
+    return n
+def top_border(i):
+    if i not in top:
+        s = copy.deepcopy(st[i]); s['b'][2] = ['thin', '#000000']; st.append(s); top[i] = len(st) - 1
+    return top[i]
+for s in d['sheets']:
+    if not re.match(r'^คะแนนรายวิชา \d+$', s['name']): continue
+    for k, c in s['cells'].items():
+        m = re.fullmatch(r'([A-Z]+)(\d+)', k); r = int(m[2])
+        if r <= 3: c['s'] = no_border(c['s'])
+        elif r == 4 and colnum(m[1]) <= 33: c['s'] = top_border(c['s'])   # A-AG
+json.dump(d, open(path, 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
