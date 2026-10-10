@@ -1,0 +1,129 @@
+/* macros.js — พอร์ตมาโคร VBA ของไฟล์ Excel มาเป็น JavaScript (ทำงานเหมือนเดิม)
+ *  Update1_Full  : จัดชื่อวิชาตามหัวข้อ (ความสามารถ 1-8) ลงชีท ปพ.6 รวม แล้วคัดลอกไป ข้อมูลป.N
+ *  HideReportRows: ซ่อนแถวว่างและแถวลายเซ็นรอง ผอ. ในชีท ปพ.6
+ *  Worksheet_Change ของชีทต่าง ๆ (เลือกนักเรียน, ข้อมูลวิชา A:C, รอง ผอ. B7)
+ *  ปริ้นทีละคน / ปริ้นทั้งหมด (รวม/เทอม1/เทอม2) */
+(function (root) {
+  'use strict';
+  const P = root.PPEngine;
+
+  function detectNames(wb) {
+    const all = wb.sheets.map(s => s.name);
+    const find = (re) => all.find(n => re.test(n));
+    const sum = find(/^ปพ\.6 .*รวม$/);
+    const term = (k) => find(new RegExp('^ปพ\\.6 .* เทอม' + k + '$'));
+    const beh = (k) => find(new RegExp('^ป\\.\\d-\\d+ เทอม' + k + '$'));
+    return {
+      info: 'ข้อมูลพื้นฐาน', subj: 'ข้อมูลวิชา',
+      sum, sumBeh: find(/^ป\.\d-\d+$/),
+      p1: find(/^ข้อมูลป\.\d+$/),
+      term: [null, term(1), term(2)], termBeh: [null, beh(1), beh(2)],
+    };
+  }
+
+  function lastNonEmptyRow(wb, sh, col) {
+    let last = 1;
+    for (let r = 1; r <= sh.maxR + 5; r++) { const v = wb.get(sh, r, col); if (v !== null && v !== '') last = r; }
+    return last;
+  }
+
+  function hideReportRows(ctx) {
+    const { wb, view, names } = ctx;
+    const src = wb.sheet(names.sum);
+    const deputy = wb.get(wb.sheet(names.info), 7, 2);
+    const noDeputy = String(deputy === null ? '' : deputy).trim().length === 0;
+    for (const nm of [names.sum, names.term[1], names.term[2]]) {
+      if (!nm) continue;
+      let m = view.rowHidden[nm]; if (!m) { m = new Map(); view.rowHidden[nm] = m; }
+      for (let r = 6; r <= 29; r++) { const v = wb.get(src, r, 5); m.set(r, String(v === null ? '' : v).trim().length === 0); }
+      for (let r = 37; r <= 39; r++) m.set(r, noDeputy);
+    }
+  }
+
+  function setBg(view, sheet, ref, color) { (view.bg[sheet] = view.bg[sheet] || {})[ref] = color; }
+
+  function update1Full(ctx) {
+    const { wb, view, names, toast } = ctx;
+    const wsD = wb.sheet(names.subj), ws2 = names.sum, wsP = wb.sheet(names.p1);
+    const lastRow = lastNonEmptyRow(wb, wsD, 1);
+    const startRow = 6;
+    // ล้างค่า + สี + แสดงแถว
+    for (let r = startRow; r < startRow + 24; r++) {
+      wb.setValue(ws2, { r, c: 5 }, null);
+      setBg(view, ws2, 'A' + r, 'none');
+      setBg(view, ws2, 'E' + r, 'none');
+      for (const nm of [ws2]) { (view.rowHidden[nm] = view.rowHidden[nm] || new Map()).set(r, false); }
+    }
+    const count = new Array(9).fill(0); let overflow = '';
+    for (let r = 2; r <= lastRow; r++) {
+      const subject = wb.get(wsD, r, 1); let cat = wb.get(wsD, r, 3);
+      if (cat === null || cat === '' || typeof cat === 'boolean') continue;
+      if (typeof cat === 'string') { const n = Number(cat.trim()); if (!isFinite(n) || cat.trim() === '') continue; cat = n; }
+      if (typeof cat !== 'number') continue;
+      cat = Math.trunc(cat);
+      const sName = subject === null ? '' : String(subject);
+      if (sName !== '' && cat >= 1 && cat <= 8) {
+        const baseRow = startRow + (cat - 1) * 3;
+        if (count[cat] < 3) {
+          wb.setValue(ws2, { r: baseRow + count[cat], c: 5 }, sName);
+          setBg(view, ws2, 'E' + (baseRow + count[cat]), 'none');
+          count[cat]++;
+        } else {
+          overflow += 'หัวข้อ ' + cat + ' เกิน 3 วิชา\n';
+          for (let k = 0; k < 3; k++) setBg(view, ws2, 'A' + (baseRow + k), '#FFC7CE');
+        }
+      }
+    }
+    hideReportRows(ctx);
+    if (overflow && toast) toast('วิชาเกินกำหนด\n' + overflow, 'warn');
+    // คัดลอกชื่อวิชาไปยัง ข้อมูลป.N แถว 2 เริ่มคอลัมน์ E
+    for (let c = 5; c <= wsP.maxC + 2; c++) wb.setValue(names.p1, { r: 2, c }, null);
+    let c = 5;
+    for (let r = startRow; r < startRow + 24; r++) {
+      const v = wb.get(wb.sheet(ws2), r, 5);
+      if (v !== null && String(v).trim() !== '') { wb.setValue(names.p1, { r: 2, c }, v); c++; }
+    }
+  }
+
+  // คืน true ถ้ายอมรับค่า, false ถ้าต้องยกเลิกการแก้ (เหมือน Target.ClearContents)
+  function onChange(ctx, sheetName, r, c) {
+    const { wb, names, toast } = ctx;
+    // ข้อมูลพื้นฐาน!B7 -> ซ่อน/แสดงลายเซ็นรอง ผอ.
+    if (sheetName === names.info && r === 7 && c === 2) hideReportRows(ctx);
+    // ข้อมูลวิชา คอลัมน์ A:C
+    if (sheetName === names.subj && c >= 1 && c <= 3) {
+      if (c === 3) {
+        const cat = wb.get(wb.sheet(names.subj), r, 3);
+        if (cat !== null && cat !== '') {
+          let n = 0; const sh = wb.sheet(names.subj);
+          for (let rr = 1; rr <= sh.maxR + 5; rr++) { const x = wb.get(sh, rr, 3); if (x !== null && x !== '' && String(x) === String(cat)) n++; }
+          if (n > 3) { if (toast) toast('หัวข้อนี้ใส่ได้ไม่เกิน 3 วิชา', 'warn'); wb.setValue(sheetName, { r, c }, null); return false; }
+        }
+      }
+      update1Full(ctx);
+    }
+    return true;
+  }
+
+  // เลือกนักเรียนที่ B3 ของชีท ปพ.6 เทอม -> ส่งไปชีทรวม
+  function redirectStudent(ctx, sheetName, r, c) {
+    const { names } = ctx;
+    if (r === 3 && (c === 2 || c === 3) && (sheetName === names.term[1] || sheetName === names.term[2])) return { sheet: names.sum, r: 3, c: 2 };
+    return null;
+  }
+
+  function studentList(ctx) {
+    const { wb, names } = ctx; const sh = wb.sheet(names.p1); const out = [];
+    for (let r = 3; r <= 42; r++) { const v = wb.get(sh, r, 2); if (v !== null && v !== '') out.push(v); }
+    return out;
+  }
+
+  // ปริ้นทีละคน / ทั้งหมด. printFn(listOfSheetNames) -> Promise ที่เสร็จเมื่อเตรียมหน้าพิมพ์แล้ว
+  function sheetsFor(ctx, which) { // which: 'sum'|1|2
+    const { names } = ctx;
+    if (which === 'sum') return [names.sum, names.sumBeh];
+    return [names.term[which], names.termBeh[which]];
+  }
+
+  root.PPMacros = { detectNames, update1Full, hideReportRows, onChange, redirectStudent, studentList, sheetsFor };
+})(typeof window !== 'undefined' ? window : globalThis);
