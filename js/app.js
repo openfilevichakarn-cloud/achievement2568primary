@@ -73,7 +73,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ป.' + g + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261010o');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261010q');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -370,14 +370,15 @@
   function printBlock(sheetName, viewOv, fitBoth) {
     const d = S.wb.sheet(sheetName).def; const pr = d.print;
     const [pw, ph] = PAPER[pr.paper] || PAPER[9];
-    const land = pr.orient === 'landscape';
+    const land = false;   // พิมพ์แนวตั้งทุกหน้า
     const W = (land ? ph : pw) / 25.4 * 96, H = (land ? pw : ph) / 25.4 * 96;
     const m = pr.m || [0.7, 0.7, 0.75, 0.75];
     const availW = W - (m[0] + m[1]) * 96, availH = H - (m[2] + m[3]) * 96;
     let area = pr.area ? pr.area.replace(/^.*!/, '') : null;
     const out = sheetHtmlFor(sheetName, false, area, viewOv);
+    if (d.flex && d.flex.items) fitBoth = true;   // คุณลักษณะ / กิจกรรม: พอดี 1 หน้า
     let zoom = 1;
-    if (pr.fitPage) {
+    if (pr.fitPage || fitBoth) {
       const fw = fitBoth ? 1 : pr.fw === 0 ? 0 : (pr.fw || 1), fh = fitBoth ? 1 : pr.fh === 0 ? 0 : (pr.fh || 1);
       const zw = fw ? availW * fw / out.width : Infinity, zh = fh ? availH * fh / out.height : Infinity;
       zoom = Math.min(1, zw, zh);
@@ -385,13 +386,13 @@
     zoom = Math.max(0.2, zoom * 0.985);
     // ปก ปพ.5: จัดกึ่งกลางหน้ากระดาษทั้งแนวนอนและแนวตั้ง
     const cover = /^ปก /.test(sheetName);
-    return { html: out.html, zoom, land, m, hc: pr.hc || cover, vc: cover, width: out.width * zoom };
+    return { html: out.html, zoom, land, m, hc: pr.hc || cover || !!(d.flex && d.flex.items), vc: cover, width: out.width * zoom };
   }
   // แบบบันทึกคะแนนรายวิชา: พิมพ์ 3 หน้า (เทอม 1 / เทอม 2 / สรุปทั้งปี) โดยซ่อนคอลัมน์ที่ไม่เกี่ยวในแต่ละหน้า
   const SCORE_PAGES = [
     { inds: 3, cols: [13, 14, 15, 30] },          // เทอม 1: ตัวชี้วัด C-L, เก็บ, สอบ, รวม, ระดับ ท.1
     { inds: 16, cols: [26, 27, 28, 31] },         // เทอม 2: ตัวชี้วัด P-Y, เก็บ, สอบ, รวม, ระดับ ท.2
-    { inds: 0, cols: [15, 28, 29, 32] },          // ทั้งปี: รวม ท.1, รวม ท.2, รวมทั้งปี, ระดับทั้งปี
+    { inds: 0, cols: [13, 14, 26, 27, 29, 32] },  // ทั้งปี: เก็บ ท.1, สอบ ท.1, เก็บ ท.2, สอบ ท.2, รวมทั้งปี, ระดับทั้งปี
   ];
   function blocksFor(sheetName) {
     const sh = S.wb.sheet(sheetName); const n = sh && sh.def.indicator;

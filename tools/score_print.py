@@ -3,6 +3,7 @@
   python3 tools/score_print.py data/p1.json && node tools/fill_cache.js data/p1.json
 - แถว 3: ชั้น/ปีการศึกษา + ครูผู้สอน + โรงเรียน รวมเป็นข้อความเดียว ผสาน A3:AG3 (ไม่ขาดเมื่อซ่อนคอลัมน์)
 - AD4 (รหัส/กลุ่มสาระ/เวลาเรียน): ตัดบรรทัดได้ และแถว 4 สูง 36pt
+- คุณลักษณะ/กิจกรรม: แถว 2 (โรงเรียน + ครูประจำชั้น) ตัดบรรทัดได้ (พิมพ์แนวตั้ง)
 """
 import json, copy, re, sys
 path = sys.argv[1] if len(sys.argv) > 1 else 'data/p1.json'
@@ -23,3 +24,12 @@ for s in d['sheets']:
     s['rh']['4'] = {'h': 36.0, 'x': 0}
 json.dump(d, open(path, 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
 print('patched', path)
+
+# คุณลักษณะ / กิจกรรม: แถว 2 (โรงเรียน + ครูประจำชั้น) ตัดบรรทัดได้เมื่อพิมพ์แนวตั้ง
+d = json.load(open(path, encoding='utf-8')); st = d['styles']; cache = {}
+for s in d['sheets']:
+    if not (s.get('flex') or {}).get('items'): continue
+    for k, c in s['cells'].items():
+        if k.endswith('2') and re.fullmatch(r'[B-Z]2', k) and 'ครูประจำชั้น' in (c.get('f') or ''):
+            c['s'] = wrap(c['s']); s['rh']['2'] = {'h': 36.0, 'x': 0}
+json.dump(d, open(path, 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))

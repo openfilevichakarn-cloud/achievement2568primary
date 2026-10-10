@@ -373,8 +373,9 @@
     const termSeg = `<div class="bar" style="margin-top:10px">${seg([[1, 'เทอม 1'], [2, 'เทอม 2'], ['y', 'สรุปทั้งปี']], T, 'sterm')}</div>`;
     const mxs = (c) => num(sc, 4, c) ?? '';
     if (T === 'y') {
-      const head = `<tr><th class="no">ที่</th><th class="stk">ชื่อ - สกุล</th><th>รวมเทอม 1<br><small>(${mxs(SC[1].tot)})</small></th><th>รวมเทอม 2<br><small>(${mxs(SC[2].tot)})</small></th><th>รวมทั้งปี<br><small>(${mxs(SC.year)})</small></th><th>ระดับทั้งปี</th></tr>`;
-      const body = stu.map(st => { const r = stuScoreRow(st.r); return `<tr><td class="no">${esc(st.no)}</td><td class="stk">${esc(st.name)}</td>${rocell(sc, r, SC[1].tot)}${rocell(sc, r, SC[2].tot)}${rocell(sc, r, SC.year, 'b')}${rocell(sc, r, SC.yearLvl, 'lvl')}</tr>`; }).join('');
+      const yc = [[SC[1].keep, 'เก็บ เทอม 1'], [SC[1].exam, 'สอบ เทอม 1'], [SC[2].keep, 'เก็บ เทอม 2'], [SC[2].exam, 'สอบ เทอม 2']];
+      const head = `<tr><th class="no">ที่</th><th class="stk">ชื่อ - สกุล</th>${yc.map(([c, l]) => `<th>${l}<br><small>(${mxs(c)})</small></th>`).join('')}<th>รวมทั้งปี<br><small>(${mxs(SC.year)})</small></th><th>ระดับทั้งปี</th></tr>`;
+      const body = stu.map(st => { const r = stuScoreRow(st.r); return `<tr><td class="no">${esc(st.no)}</td><td class="stk">${esc(st.name)}</td>${yc.map(([c]) => rocell(sc, r, c)).join('')}${rocell(sc, r, SC.year, 'b')}${rocell(sc, r, SC.yearLvl, 'lvl')}</tr>`; }).join('');
       return `${pickBar}${termSeg}<div class="card soft"><span class="hint">ระดับคำนวณจากคะแนนรวมทั้งปี ตามเกณฑ์ ร้อยละ 75 / 65 / 55</span></div>${gridWrap('score', head, body)}`;
     }
     const inds = activeInds(sc, T), mf = (c) => inputFor(sc, 4, c, { kind: 'n', mode: 'numeric', after: 'maxchg' });
