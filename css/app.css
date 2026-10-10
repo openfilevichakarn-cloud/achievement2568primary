@@ -24,7 +24,9 @@ button,input,select{font:inherit;color:inherit}
 .icon{background:none;border:0;font-size:1.4rem;cursor:pointer;display:none;padding:.2rem .5rem}
 
 /* login */
-.login{min-height:100%;display:grid;place-items:center;padding:24px 16px}
+.login{min-height:100%;display:grid;place-items:center;padding:24px 16px;background:#eef4fb url('../img/login-bg.webp') center/cover no-repeat}
+.login .login-card{background:rgba(255,255,255,.88);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);box-shadow:0 18px 50px rgba(20,60,140,.18);border-color:rgba(255,255,255,.7);color:#1a2233}
+@media (max-width:700px){.login{background-position:18% bottom}}
 .login-card{background:var(--panel);width:min(440px,100%);padding:28px;border-radius:16px;box-shadow:var(--shadow);border:1px solid var(--line)}
 .login-card h1{font-size:1.5rem;margin:0 0 .5rem;line-height:1.25}
 .login-card h1 small{font-size:.95rem;font-weight:400;color:var(--muted)}
@@ -36,7 +38,7 @@ button,input,select{font:inherit;color:inherit}
 .err{color:var(--err);min-height:1.4em;margin:.5rem 0 0}
 .demo{background:color-mix(in srgb,var(--warn) 12%,transparent);border:1px solid var(--warn);padding:.5rem .7rem;border-radius:8px;font-size:.92rem}
 .fine{color:var(--muted);font-size:.8rem;margin:1rem 0 0;text-align:center}
-.fine a{color:var(--brand);font-weight:600}
+.fine a{color:var(--brand);font-weight:600;white-space:nowrap}
 .nw{white-space:nowrap}
 
 /* app shell */
