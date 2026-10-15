@@ -34,28 +34,34 @@
   }
 
   // โหมดทดลอง: เก็บในเบราว์เซอร์นี้เท่านั้น (ใช้ตอนยังไม่ได้ตั้งค่า Supabase)
+  // เว็บตัวอย่าง (PP_CONFIG.SAMPLE_DIR): ครั้งแรกโหลดข้อมูลตัวอย่างจาก sample/pN.json แล้วเก็บการแก้ไขไว้ในเบราว์เซอร์
   class DemoBackend {
-    constructor() { this.demo = true; }
+    constructor(cfg) { this.demo = true; this.cfg = cfg || {}; this.prefix = this.cfg.SAMPLE_DIR ? 'pp_sample_' : 'pp_demo_'; }
     async login(code) {
       if (norm(code) !== 'DEMO') throw new Error('โหมดทดลองใช้รหัส DEMO');
-      return { ok: true, school_name: 'โรงเรียนตัวอย่าง (โหมดทดลอง)', grades: (root.PP_CONFIG && root.PP_CONFIG.GRADES_READY) || [1] };
+      return { ok: true, school_name: this.cfg.DEMO_SCHOOL || 'โรงเรียนตัวอย่าง (โหมดทดลอง)', grades: this.cfg.GRADES_READY || [1] };
     }
     async load(code, grade) {
-      let raw = null; try { raw = localStorage.getItem('pp_demo_' + grade); } catch (e) { /* ignore */ }
-      if (!raw) return { data: null, version: 0 };
-      return JSON.parse(raw);
+      let raw = null; try { raw = localStorage.getItem(this.prefix + grade); } catch (e) { /* ignore */ }
+      if (raw) return JSON.parse(raw);
+      if (this.cfg.SAMPLE_DIR) {
+        const res = await fetch(this.cfg.SAMPLE_DIR + '/p' + grade + '.json?v=' + (this.cfg.BUILD || ''));
+        if (res.ok) return { data: await res.json(), version: 0 };
+      }
+      return { data: null, version: 0 };
     }
     async save(code, grade, data, baseVersion) {
       const v = (baseVersion || 0) + 1;
-      try { localStorage.setItem('pp_demo_' + grade, JSON.stringify({ data, version: v })); } catch (e) { /* ignore */ }
+      try { localStorage.setItem(this.prefix + grade, JSON.stringify({ data, version: v })); } catch (e) { /* ignore */ }
       return { ok: true, version: v };
     }
+    reset() { try { Object.keys(localStorage).filter(k => k.startsWith(this.prefix) || k.startsWith('pp_draft_')).forEach(k => localStorage.removeItem(k)); } catch (e) { /* ignore */ } }
   }
 
   root.PPBackend = {
     create(cfg) {
       if (cfg && cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY) return new SupabaseBackend(cfg);
-      return new DemoBackend();
+      return new DemoBackend(cfg);
     },
     norm,
   };

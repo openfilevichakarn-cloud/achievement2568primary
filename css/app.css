@@ -104,6 +104,13 @@ td .rot{white-space:nowrap}
   .brand{font-size:1rem;max-width:42vw;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 }
 
+/* ===== ลายน้ำ (เว็บตัวอย่าง) ===== */
+.wm-layer{position:fixed;inset:-30%;z-index:9000;pointer-events:none;user-select:none;display:flex;flex-wrap:wrap;align-content:space-around;justify-content:space-around;gap:110px 140px;transform:rotate(-28deg);overflow:hidden}
+.wm-layer span{font:700 34px/1 'Sarabun',sans-serif;color:rgba(220,38,38,.11);white-space:nowrap}
+.pp-page{position:relative}
+.pp-page .wm-layer{position:absolute;inset:-25%;gap:150px 120px;z-index:5}
+.pp-page .wm-layer span{font-size:46px;color:rgba(220,38,38,.13)}
+
 /* ===== พิมพ์ ===== */
 #print-root{display:none}
 @page { margin: 0; }

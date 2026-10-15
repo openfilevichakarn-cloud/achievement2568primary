@@ -78,7 +78,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ป.' + g + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261015e');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261015f');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -412,7 +412,7 @@
   async function printSheets(list, preBuilt) {
     const blocks = preBuilt || list.filter(Boolean).flatMap(blocksFor);
     const root = $('#print-root');
-    root.innerHTML = blocks.map(b => `<section class="pp-page ${b.land ? 'land' : 'port'}${b.vc ? ' vc' : ''}" style="padding:${b.m[2]}in ${b.m[1]}in ${b.m[3]}in ${b.m[0]}in"><div class="pp-zoom" style="zoom:${b.zoom};--bw:${1 / b.zoom}px${b.hc ? ';margin:0 auto;width:max-content' : ''}">${b.html}</div></section>`).join('');
+    root.innerHTML = blocks.map(b => `<section class="pp-page ${b.land ? 'land' : 'port'}${b.vc ? ' vc' : ''}" style="padding:${b.m[2]}in ${b.m[1]}in ${b.m[3]}in ${b.m[0]}in"><div class="pp-zoom" style="zoom:${b.zoom};--bw:${1 / b.zoom}px${b.hc ? ';margin:0 auto;width:max-content' : ''}">${b.html}</div>${wmLayer(14)}</section>`).join('');
     document.body.classList.add('printing');
     await new Promise(r => setTimeout(r, 120));
     window.print();
@@ -451,8 +451,21 @@
   }
   function openCover(sheet, subj) { if (subj !== undefined) applyValue(sheet, SUBJ_CELL.r, SUBJ_CELL.c, subj); openDoc(sheet); }
 
+  // ลายน้ำ (เว็บตัวอย่าง: PP_CONFIG.WATERMARK) — ทับทุกหน้าจอและทุกหน้าที่พิมพ์
+  function wmLayer(n) { return CFG.WATERMARK ? `<div class="wm-layer" aria-hidden="true">${`<span>${esc(CFG.WATERMARK)}</span>`.repeat(n)}</div>` : ''; }
+
   // ---------------------------------------------------------------- boot
   function boot() {
+    if (CFG.WATERMARK) document.body.insertAdjacentHTML('beforeend', wmLayer(80));
+    if (CFG.SAMPLE_DIR) {   // เว็บตัวอย่าง: ข้อความหน้าเข้าสู่ระบบ + ปุ่มคืนค่าข้อมูลตัวอย่าง
+      $('#demo-note').innerHTML = '<b>เว็บตัวอย่างสำหรับทดลองใช้</b> — มีข้อมูลนักเรียนสมมติ 40 คนทุกชั้น (ป.1–ป.6) แก้ไขได้อิสระ การแก้ไขเก็บในเบราว์เซอร์นี้เท่านั้น กด “เข้าสู่ระบบ” ได้ทันที (รหัส <code>DEMO</code>)';
+      $('#save-now').insertAdjacentHTML('beforebegin', '<button id="sample-reset" class="btn" title="ล้างการแก้ไขทั้งหมด กลับเป็นข้อมูลตัวอย่าง">คืนค่าตัวอย่าง</button>');
+      $('#sample-reset').onclick = async () => {
+        const yes = await modal('คืนค่าข้อมูลตัวอย่าง', '<p>ล้างการแก้ไขทั้งหมดในเบราว์เซอร์นี้ และกลับไปใช้ข้อมูลตัวอย่างเดิมทุกชั้น?</p>', [{ label: 'ยกเลิก', value: false }, { label: 'คืนค่า', value: true, primary: true }]);
+        if (!yes) return;
+        S.dirty = false; clearTimeout(S.saveTimer); backend.reset(); location.reload();
+      };
+    }
     $('#login-form').addEventListener('submit', (e) => { e.preventDefault(); doLogin($('#login-code').value, $('#login-remember').checked); });
     $('#logout').onclick = logout;
     $('#doc-close').onclick = closeDoc;

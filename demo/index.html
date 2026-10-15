@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f5eff">
+<title>ทดลองใช้ — โปรแกรมแจ้งผลการศึกษา ปพ.5 และ ปพ.6</title>
+<meta name="robots" content="noindex">
+<script src="js/theme.js?v=20261015f"></script>
+<link rel="stylesheet" href="css/app.css?v=20261015f">
+<link rel="stylesheet" href="css/ui.css?v=20261015f">
+<style id="xl-css"></style>
+</head>
+<body>
+
+<!-- ============ เข้าสู่ระบบ ============ -->
+<main id="login" class="login">
+  <button class="btn theme-fab" type="button" data-theme-toggle aria-label="สลับโหมดมืด/สว่าง">🌙</button>
+  <form id="login-form" class="login-card" autocomplete="off">
+    <h1>โปรแกรมแจ้งผลการศึกษา <span class="nw">ปพ.5 และ ปพ.6</span><br><small>หลักสูตรการศึกษาขั้นพื้นฐาน 2568 (ประถมศึกษา)</small></h1>
+    <p class="lead">ทดลองใช้งานโปรแกรมได้ทุกเมนู พร้อมข้อมูลตัวอย่างครบทุกชั้น เพื่อประกอบการตัดสินใจก่อนสั่งซื้อ</p>
+    <label for="login-code">รหัสสิทธิ์โรงเรียน</label>
+    <input id="login-code" type="text" inputmode="text" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX" required>
+    <label class="chk"><input id="login-remember" type="checkbox"> จำรหัสในเครื่องนี้</label>
+    <button id="login-go" class="btn primary wide" type="submit">เข้าสู่ระบบ</button>
+    <p id="login-err" class="err" role="alert"></p>
+    <p id="demo-note" class="demo" hidden><b>โหมดทดลอง</b> — ยังไม่ได้ตั้งค่า Supabase ข้อมูลเก็บในเบราว์เซอร์เครื่องนี้เท่านั้น (รหัส <code>DEMO</code>)</p>
+    <p class="fine">สงวนลิขสิทธิ์ ห้ามนำไปแจก จ่าย ขายต่อ หรือแอบอ้าง · <a href="https://www.facebook.com/filevichakan/" target="_blank" rel="noopener">เปิดไฟล์วิชาการ</a></p>
+  </form>
+</main>
+
+<!-- ============ แอป ============ -->
+<div id="app" hidden>
+  <header class="topbar">
+    <div class="brand"><span id="school-name"></span><span class="lock" title="ชื่อโรงเรียนถูกล็อกตามรหัสสิทธิ์">🔒</span><span class="grade" id="grade-label"></span></div>
+    <select id="grade-switch" hidden aria-label="ชั้น"></select>
+    <span class="grow"></span>
+    <span id="savestat" class="savestat"></span>
+    <button id="save-now" class="btn" aria-label="บันทึก">บันทึก</button>
+    <button id="open-docs" class="btn" aria-label="เอกสารพิมพ์">เอกสาร</button>
+    <button class="btn ghost theme-btn" type="button" data-theme-toggle aria-label="สลับโหมดมืด/สว่าง">🌙</button><button id="logout" class="btn ghost" aria-label="ออกจากระบบ">ออก</button>
+  </header>
+  <main id="view" class="view"></main>
+  <nav id="tabbar" class="tabbar" aria-label="เมนูหลัก"></nav>
+
+  <!-- เอกสารรูปแบบทางการ (ดู/พิมพ์) -->
+  <section id="docviewer" class="docviewer" hidden>
+    <div class="sheet-head"><button id="doc-close" class="btn">← กลับ</button><h2 id="sheet-title"></h2><div id="sheet-tools" class="tools"></div></div>
+    <div id="sheet-scroll" class="sheet-scroll"><div id="sheet-host"></div></div>
+  </section>
+  <div id="loading" class="loading"><div class="spin"></div><p id="loading-msg">กำลังโหลด...</p></div>
+</div>
+
+<input id="logo-file" type="file" accept="image/png,image/jpeg,image/gif,image/bmp,image/webp" hidden>
+<div id="modal" class="modal" hidden></div>
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<div id="print-root"></div>
+
+<script src="js/config.js?v=20261015f"></script>
+<script src="js/engine.js?v=20261015f"></script>
+<script src="js/render.js?v=20261015f"></script>
+<script src="js/macros.js?v=20261015f"></script>
+<script src="js/backend.js?v=20261015f"></script>
+<script src="js/app.js?v=20261015f"></script>
+<script src="js/ui.js?v=20261015f"></script>
+</body>
+</html>
