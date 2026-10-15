@@ -235,7 +235,7 @@
         ${gcell(L.stu, r, 2, 't', i, 0, { after: 'stu', cls: 'stk wide', align: 'left' })}${gcell(L.stu, r, 3, 'sex', i, 1, { cls: 'sex' })}${gcell(L.stu, r, 4, 'n', i, 2, { lo: 0, hi: 100, cls: 'att' })}
         <td class="del">${nm.trim() || att !== null || txt(L.stu, r, 3) ? `<button class="btn ghost sm" data-act="stu-del" data-r="${r}" aria-label="ลบนักเรียน">ลบ</button>` : ''}</td></tr>`;
     }).join('');
-    return `<div class="bar"><span><b>${n}</b> / ${rows.length} คน</span></div>
+    return `<div class="bar"><span><b>${n}</b> / ${rows.length} คน</span><span class="grow"></span>${xlBtn('stu')}</div>
       <p class="sub">ใช้งานเหมือนชีท Excel: คลิกช่องแล้วพิมพ์ หรือคัดลอกหลายช่องจาก Excel / Google Sheets มาวาง (Ctrl+V) ได้ทันที · เพศพิมพ์ ช / ญ ได้ (ถ้าเว้นว่าง ระบบเดาจากคำนำหน้า)</p>
       ${gridWrap('stu', head, body, 'fit')}`;
   }
@@ -383,7 +383,7 @@
     const pickBar = `<div class="pick"><button class="btn" data-act="subj-step" data-d="-1" aria-label="วิชาก่อนหน้า"${idx === 0 ? ' disabled' : ''}>‹</button>
       <select data-act-change="subj">${subs.map(s => `<option value="${s.r}"${s.r === cur.r ? ' selected' : ''}>${esc(oneLine(s.name))}</option>`).join('')}</select>
       <button class="btn" data-act="subj-step" data-d="1" aria-label="วิชาถัดไป"${idx === subs.length - 1 ? ' disabled' : ''}>›</button></div>`;
-    const termSeg = `<div class="bar" style="margin-top:10px">${seg([[1, 'เทอม 1'], [2, 'เทอม 2'], ['y', 'สรุปทั้งปี']], T, 'sterm')}</div>`;
+    const termSeg = `<div class="bar" style="margin-top:10px">${seg([[1, 'เทอม 1'], [2, 'เทอม 2'], ['y', 'สรุปทั้งปี']], T, 'sterm')}${T === 'y' ? '' : `<span class="grow"></span>${xlBtn('score')}`}</div>`;
     const mxs = (c) => num(sc, 4, c) ?? '';
     if (T === 'y') {
       const yc = [[SC[1].keep, 'เก็บ เทอม 1'], [SC[1].exam, 'สอบ เทอม 1'], [SC[2].keep, 'เก็บ เทอม 2'], [SC[2].exam, 'สอบ เทอม 2']];
@@ -532,7 +532,7 @@
     }).join('');
     return `<div class="bar">${seg([['trait', 'คุณลักษณะอันพึงประสงค์'], ['act', 'กิจกรรมพัฒนาผู้เรียน']], kind, 'akind')}${seg([[1, 'เทอม 1'], [2, 'เทอม 2'], ['y', 'ทั้งปี']], t, 'aterm')}</div>${names}
       ${Y ? `<p class="sub">ผลทั้งปีคำนวณจากเทอม 1 และเทอม 2 อัตโนมัติ (แก้ไขที่หน้าเทอม): หัวข้อที่ <b>ไม่ผ่าน</b> เทอมใดเทอมหนึ่ง = ไม่ผ่าน · <b>ผ่าน</b> ทั้ง 2 เทอม = ผ่าน · ยังประเมินไม่ครบ = ว่าง</p>${gridWrap('assess', head, body)}` : `<p class="sub">ใช้งานเหมือนชีท Excel: พิมพ์ <b>ผ่าน</b> / <b>ไม่ผ่าน</b> (หรือ 1 / 0, ✓ / ✗) · Space สลับค่า · ดับเบิลคลิกเพื่อสลับ · วางหลายช่องจาก Excel ได้ · แตะหัวคอลัมน์เพื่อตั้งทั้งห้องเป็น “ผ่าน”</p>
-      <div class="bar"><button class="btn" data-act="aall" data-v="ผ่าน">ตั้งทั้งหมดเป็น “ผ่าน”</button><button class="btn danger" data-act="aall" data-v="">ล้างทั้งหมด</button></div>
+      <div class="bar"><button class="btn" data-act="aall" data-v="ผ่าน">ตั้งทั้งหมดเป็น “ผ่าน”</button><button class="btn danger" data-act="aall" data-v="">ล้างทั้งหมด</button><span class="grow"></span>${xlBtn('assess')}</div>
       ${gridWrap('assess', head, body)}`}`;
   }
   function asAdd() {
@@ -748,6 +748,46 @@
       <div class="dlist">${names.map(n => `<div class="ditem"><button class="open" data-act="open-doc" data-n="${esc(n)}">${esc(label(n))}</button>${parts(n)}</div>`).join('')}</div></div>`;
   }
 
+  // ---------------------------------------------------------------- แบบฟอร์ม Excel (กรอกใน Excel แล้วคัดลอกมาวางในตาราง)
+  // คอลัมน์ในไฟล์เรียงตรงกับช่องกรอกในตารางของหน้านั้นทุกประการ — คัดลอกทั้งก้อนแล้ววางที่ช่องแรกได้ทันที
+  const xlBtn = (k) => `<button class="btn" data-act="xlform" data-k="${k}" title="ดาวน์โหลดแบบฟอร์ม Excel ที่มีคอลัมน์ตรงกับตารางนี้ กรอกเสร็จแล้วคัดลอกมาวาง">⬇ แบบฟอร์ม Excel</button>`;
+  function xlForm(k) {
+    const S = A().S, g = S.grade, stu = students(), blank = (v) => v === null || v === undefined || isPh(v) ? '' : v;
+    const howTo = (first) => `วิธีใช้: กรอกเฉพาะช่องสีขาว แล้วเลือกช่องสีขาวทั้งหมดตั้งแต่แถวแรก (คลิกช่องแรก แล้วกด Shift ค้างคลิกช่องสุดท้าย) กด Ctrl+C → กลับมาที่โปรแกรม คลิก${first} แล้วกด Ctrl+V · ห้ามสลับลำดับแถวหรือคอลัมน์`;
+    let file, o;
+    if (k === 'stu') {
+      const rows = [];
+      for (let r = L.stuFirst; r <= L.stuLast; r++) rows.push([get(L.stu, r, 1) ?? r - 2, blank(get(L.stu, r, 2)), blank(get(L.stu, r, 3)), blank(get(L.stu, r, 4))]);
+      file = `form-students-p${g}.xlsx`;
+      o = { name: 'นักเรียน', title: `แบบฟอร์มรายชื่อนักเรียน ชั้นประถมศึกษาปีที่ ${g}`, cols: [6, 36, 14, 14], ref: 1,
+        head: ['ที่', 'ชื่อ - สกุล\n(เช่น เด็กชายสมชาย ใจดี)', 'เพศ\n(ชาย / หญิง)', 'เข้าเรียน\n(ร้อยละ 0-100)'], rows,
+        valid: [{ col: 3, type: 'list', list: ['ชาย', 'หญิง'], msg: 'เลือก ชาย หรือ หญิง' }, { col: 4, type: 'decimal', min: 0, max: 100, msg: 'กรอกตัวเลข 0-100' }],
+        note: howTo('ช่อง “ชื่อ - สกุล” ของนักเรียนคนที่ 1') };
+    } else if (k === 'score') {
+      if (!stu.length) { A().toast('เพิ่มรายชื่อนักเรียนก่อน', 'warn'); return; }
+      const cur = curSubject(), sc = L.score(cur.slot), T = U.scoreTerm, inds = activeInds(sc, T), cols = [...inds, SC[T].exam];
+      const mx = (c) => num(sc, 4, c) ?? 0;
+      file = `form-scores-p${g}-subject${cur.slot}-term${T}.xlsx`;
+      o = { name: 'คะแนน เทอม ' + T, title: `แบบฟอร์มคะแนน ${oneLine(cur.name)} · เทอม ${T} · ชั้น ป.${g}`, ref: 2,
+        cols: [6, 32, ...cols.map(() => 13), 22],
+        head: ['ที่', 'ชื่อ - สกุล', ...inds.map((c, i) => `${indLabel(sc, c, i)}\n(เต็ม ${mx(c)})`), `คะแนนสอบ\n(เต็ม ${mx(SC[T].exam)})`, 'หมายเหตุ'],
+        rows: stu.map(st => { const r = stuScoreRow(st.r); return [st.no, st.name, ...cols.map(c => blank(get(sc, r, c))), blank(get(sc, r, SC.note))]; }),
+        valid: cols.map((c, i) => ({ col: 3 + i, type: 'decimal', min: 0, max: mx(c), msg: `กรอกคะแนน 0-${mx(c)}` })),
+        note: howTo('ช่องคะแนนแรกของนักเรียนคนที่ 1') + ' · คะแนนเก็บและคะแนนรวม โปรแกรมคำนวณให้เอง' };
+    } else {
+      if (!stu.length) { A().toast('เพิ่มรายชื่อนักเรียนก่อน', 'warn'); return; }
+      const kind = U.kind, t = U.aTerm, sh = asSheet(kind, t), heads = activeItems(kind), label = kind === 'trait' ? 'คุณลักษณะอันพึงประสงค์' : 'กิจกรรมพัฒนาผู้เรียน';
+      file = `form-${kind === 'trait' ? 'trait' : 'activity'}-p${g}-term${t}.xlsx`;
+      o = { name: (kind === 'trait' ? 'คุณลักษณะ' : 'กิจกรรม') + ' เทอม ' + t, title: `แบบฟอร์มประเมิน${label} · เทอม ${t} · ชั้น ป.${g}`, ref: 2,
+        cols: [6, 32, ...heads.map(() => 15)], head: ['ที่', 'ชื่อ - สกุล', ...heads.map(c => oneLine(txt(asSheet(kind, 1), 3, c)))],
+        rows: stu.map(st => [st.no, st.name, ...heads.map(c => blank(get(sh, stuTraitRow(st.r), c)))]),
+        valid: heads.map((c, i) => ({ col: 3 + i, type: 'list', list: ['ผ่าน', 'ไม่ผ่าน'], msg: 'เลือก ผ่าน หรือ ไม่ผ่าน' })),
+        note: howTo('ช่องแรกของนักเรียนคนที่ 1') };
+    }
+    root.PPXlsx.download(file, o);
+    A().toast('ดาวน์โหลดแบบฟอร์มแล้ว — กรอกใน Excel แล้วคัดลอกช่องสีขาวมาวางที่ตาราง', 'ok');
+  }
+
   // ---------------------------------------------------------------- คู่มือการใช้งาน
   const MANUAL = [
     ['start', 'เริ่มต้นใช้งาน', null, `
@@ -766,6 +806,7 @@
       <p>เมนู <b>ข้อมูล → นักเรียน</b> (สูงสุด 40 คนต่อชั้น)</p>
       <ul><li>ใช้งานเหมือน Excel: คลิกช่องแล้วพิมพ์ กด Enter / ลูกศร เพื่อเลื่อนช่อง</li>
       <li><b>วางทีเดียวทั้งห้อง:</b> คัดลอกคอลัมน์ ชื่อ-สกุล (และเพศ, % เข้าเรียน ถ้ามี) จาก Excel / Google Sheets แล้วคลิกช่องแรก กด <kbd>Ctrl</kbd>+<kbd>V</kbd></li>
+<li><b>แบบฟอร์ม Excel:</b> กดปุ่ม <b>⬇ แบบฟอร์ม Excel</b> ได้ไฟล์ที่คอลัมน์ตรงกับตารางในหน้านี้ กรอกเฉพาะช่องสีขาว แล้วคัดลอกช่องสีขาวทั้งหมดมาวางที่ช่องแรกของตาราง</li>
       <li>เพศพิมพ์ <b>ช</b> / <b>ญ</b> ได้ ถ้าเว้นว่าง ระบบเดาจากคำนำหน้า (เด็กชาย / เด็กหญิง)</li>
       <li>% เข้าเรียน กรอก 0–100 · ปุ่ม <b>ลบ</b> ท้ายแถวลบนักเรียนพร้อมคะแนนและผลประเมินของคนนั้น</li></ul>`],
     ['subjects', 'รายวิชาและความสามารถ', 'data:subjects', `
@@ -778,6 +819,7 @@
     ['scores', 'บันทึกคะแนน', 'scores', `
       <p>เมนู <b>คะแนน</b> — เลือกวิชาจากช่องด้านบน (หรือกด ‹ › เปลี่ยนวิชา) และเลือก <b>เทอม 1 / เทอม 2</b></p>
       <ul><li><b>ตั้งคะแนนเต็มก่อน:</b> กำหนดคะแนนเต็มของแต่ละตัวชี้วัดและคะแนนสอบ — กด <b>＋ เพิ่มตัวชี้วัด</b> / <b>－ ลดตัวชี้วัด</b> (สูงสุด 10 ตัวต่อเทอม) และตั้งชื่อตัวชี้วัดได้</li>
+<li><b>แบบฟอร์ม Excel:</b> กดปุ่ม <b>⬇ แบบฟอร์ม Excel</b> ได้ไฟล์ที่คอลัมน์ตรงกับตารางในหน้านี้ (มีรายชื่อนักเรียนให้แล้ว) กรอกเฉพาะช่องสีขาว แล้วคัดลอกช่องสีขาวทั้งหมดมาวางที่ช่องแรกของตาราง</li>
       <li><b>คะแนนเก็บ = ผลรวมคะแนนตัวชี้วัด</b> คำนวณให้อัตโนมัติ ไม่ต้องกรอก</li>
       <li>กรอกคะแนนรายตัวชี้วัดและคะแนนสอบ หรือวางจาก Excel ทีละหลายช่อง (<kbd>Ctrl</kbd>+<kbd>V</kbd>) — กรอกเกินคะแนนเต็มระบบจะไม่รับ</li>
       <li>ระดับผลการเรียนคำนวณอัตโนมัติจากร้อยละ: <b>75</b> ขึ้นไป = เชี่ยวชาญ · <b>65</b> = ชำนาญ · <b>55</b> = พัฒนา · ต่ำกว่า = เริ่มต้น</li>
@@ -786,6 +828,7 @@
       <p>เมนู <b>ประเมิน</b> — เลือก <b>คุณลักษณะอันพึงประสงค์</b> หรือ <b>กิจกรรมพัฒนาผู้เรียน</b> และเลือกเทอม</p>
       <ul><li>ในแต่ละช่องพิมพ์ <b>ผ่าน</b> / <b>ไม่ผ่าน</b> (หรือ 1 / 0) · <b>ดับเบิลคลิก</b> หรือกด <kbd>Space</kbd> เพื่อสลับค่า</li>
       <li>กดปุ่ม <b>ตั้งทั้งหมดเป็น “ผ่าน”</b> แล้วค่อยแก้เฉพาะคนที่ไม่ผ่าน จะเร็วที่สุด · แตะหัวคอลัมน์ = ตั้งทั้งห้องเป็นผ่านเฉพาะหัวข้อนั้น</li>
+<li><b>แบบฟอร์ม Excel:</b> กดปุ่ม <b>⬇ แบบฟอร์ม Excel</b> ได้ไฟล์ที่คอลัมน์ตรงกับตารางในหน้านี้ (มีรายชื่อนักเรียนให้แล้ว) กรอกเฉพาะช่องสีขาว แล้วคัดลอกช่องสีขาวทั้งหมดมาวางที่ช่องแรกของตาราง</li>
       <li>เพิ่ม / ลด / แก้ชื่อหัวข้อได้ (คุณลักษณะสูงสุด 12 · กิจกรรมสูงสุด 8) ใช้ร่วมกันทั้ง 2 เทอม</li>
       <li>แท็บ <b>ทั้งปี</b> คำนวณเอง: ไม่ผ่านเทอมใดเทอมหนึ่ง = ไม่ผ่าน · ผ่านทั้ง 2 เทอม = ผ่าน</li></ul>`],
     ['reports', 'รายงาน ปพ.5 และ ปพ.6', 'report', `
@@ -861,6 +904,7 @@
       case 'p5term': U.p5Term = b.dataset.k === 'sum' ? 'sum' : +b.dataset.k; refresh(); break;
       case 'print-doc': A().printSheets([b.dataset.n]); break;
       case 'backup-out': A().exportBackup(); break;
+      case 'xlform': xlForm(b.dataset.k); break;
       case 'man-go': { const d = $('#man-' + b.dataset.id); if (d) { d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'start' }); } break; }
       case 'backup-in': A().pickBackup(); break;
       case 'print-score': A().printScores(b.dataset.n === '*' ? subjects().map(s => L.score(s.slot)) : [b.dataset.n], b.dataset.part); break;
