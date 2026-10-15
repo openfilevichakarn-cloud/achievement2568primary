@@ -32,3 +32,20 @@ for s in d['sheets']:
         s['merges'].append(f'{c0}{r}:{c1}{r}'); n += 1
 json.dump(d, open(path, 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
 print('patched', n, 'rows', path)
+
+# ชิดซ้ายให้จุดไข่ปลาทั้ง 3 บรรทัดเริ่มตรงกัน โดยเยื้อง (indent, 1 หน่วย = 9px) ให้ทั้งกลุ่มอยู่กลางหน้า
+# วัดจากหน้าจอ: บรรทัดยาวสุดกว้าง ~440px · ช่องรายวิชา (B:O) กว้าง 691px · ช่องรายชั้น (B:P) กว้าง 855px
+d = json.load(open(path, encoding='utf-8')); st = d['styles']; left = {}
+for s in d['sheets']:
+    if not s['name'].startswith('ปก ปพ.5'): continue
+    ind = 14 if 'รายวิชา' in s['name'] else 23
+    for c in s['cells'].values():
+        v = c.get('v')
+        if isinstance(v, str) and v.startswith('.' * 10) and v.endswith(LABELS):
+            key = (c['s'], ind)
+            if st[c['s']]['a'][0] == 'left': continue
+            if key not in left:
+                x = copy.deepcopy(st[c['s']]); x['a'][0] = 'left'; x['a'][3] = ind; st.append(x); left[key] = len(st) - 1
+            c['s'] = left[key]
+json.dump(d, open(path, 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
+print('left-aligned signature rows', path)

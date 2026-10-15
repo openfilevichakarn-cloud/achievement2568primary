@@ -28,8 +28,8 @@
       if (h === 'center' || h === 'centerContinuous') css += 'text-align:center;'; else if (h === 'right') css += 'text-align:right;'; else if (h === 'left') css += 'text-align:left;'; else if (h === 'justify') css += 'text-align:justify;';
       css += 'vertical-align:' + (v === 'center' ? 'middle' : v === 'top' ? 'top' : 'bottom') + ';';
       css += a[2] ? 'white-space:pre-wrap;word-break:break-word;' : 'white-space:pre;';
-      if (a[3]) css += `padding-left:${a[3] * 9 + 2}px;`;
       out.push(`.s${i}{${css}}`);
+      if (a[3]) out.push(`table.xl td.s${i}{padding-left:${a[3] * 9 + 2}px}`);   // เยื้อง (ต้องชนะ table.xl td{padding})
       if (a[4] === 90 || a[4] === 180) out.push(`.s${i} .rot{writing-mode:vertical-rl;transform:rotate(180deg);display:inline-block;}`);
       else if (a[4] === 255) out.push(`.s${i} .rot{writing-mode:vertical-rl;text-orientation:upright;display:inline-block;}`);
     });
