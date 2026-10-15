@@ -278,8 +278,11 @@ details.man>summary .no{display:inline-grid;place-items:center;width:28px;height
 @media (max-width:899px){.tabbar button{font-size:.66rem;line-height:1.15;text-align:center}}
 
 /* พิมพ์เล่ม ปพ.5 */
-.bsubs{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:4px 16px}
-.bgrp{padding:8px 0;border-top:1px solid var(--line)}.bgrp:first-child{border-top:0}
+.books{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;margin-bottom:12px}
+.card.book{display:flex;flex-direction:column;margin:0}
+.card.book .bk-head{display:flex;flex-direction:column;gap:2px}
+.card.book .bpages{flex:1;margin:8px 0 12px;font-size:.92rem}
+.card.book .btn{align-self:stretch}
 .bpages{margin:4px 0 0;padding-left:2.4rem}
 .bpages li{margin:2px 0;break-inside:avoid}
 .card label.chk{display:flex;gap:.5rem;align-items:center;margin:.35rem 0;cursor:pointer}
