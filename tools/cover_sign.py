@@ -38,12 +38,13 @@ print('patched', n, 'rows', path)
 d = json.load(open(path, encoding='utf-8')); st = d['styles']; left = {}
 for s in d['sheets']:
     if not s['name'].startswith('ปก ปพ.5'): continue
-    ind = 14 if 'รายวิชา' in s['name'] else 23
+    ind = 20 if 'รายวิชา' in s['name'] else 29      # ปรับตามที่ผู้ใช้ขอ (ขยับขวาจากกึ่งกลางเล็กน้อย)
     for c in s['cells'].values():
         v = c.get('v')
         if isinstance(v, str) and v.startswith('.' * 10) and v.endswith(LABELS):
             key = (c['s'], ind)
-            if st[c['s']]['a'][0] == 'left': continue
+            if st[c['s']]['a'][0] == 'left':          # ทำไปแล้ว: ปรับค่าเยื้องอย่างเดียว
+                st[c['s']]['a'][3] = ind; continue
             if key not in left:
                 x = copy.deepcopy(st[c['s']]); x['a'][0] = 'left'; x['a'][3] = ind; st.append(x); left[key] = len(st) - 1
             c['s'] = left[key]
