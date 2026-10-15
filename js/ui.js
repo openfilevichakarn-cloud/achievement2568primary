@@ -8,7 +8,7 @@
   const esc = R.esc;
   const A = () => root.PPApp;
   const LEVELS = ['เริ่มต้น', 'พัฒนา', 'ชำนาญ', 'เชี่ยวชาญ'];
-  const U = { book: { term: 'sum', pick: null, cls: true, assess: false, duplex: false }, tab: 'home', sub: { data: 'school' }, scoreTerm: 1, slot: null, kind: 'trait', aTerm: 1, repMode: 'one', repTerm: 'sum', p5Term: 1, pendSub: new Set() };
+  const U = { book: { term: 'sum', pick: null, assess: false }, tab: 'home', sub: { data: 'school' }, scoreTerm: 1, slot: null, kind: 'trait', aTerm: 1, repMode: 'one', repTerm: 'sum', p5Term: 1, pendSub: new Set() };
   let L = null;
 
   // ---------------------------------------------------------------- เข้าถึงข้อมูลในเวิร์กบุ๊ก
@@ -749,49 +749,67 @@
       <div class="dlist">${names.map(n => `<div class="ditem"><button class="open" data-act="open-doc" data-n="${esc(n)}">${esc(label(n))}</button>${parts(n)}</div>`).join('')}</div></div>`;
   }
 
-  // ---------------------------------------------------------------- พิมพ์ ปพ.5 รายวิชาเป็นเล่ม
-  // ลำดับต่อ 1 วิชา: ปกรายวิชา → แบบบันทึกคะแนน (ทั้งปี: เทอม 1 → เทอม 2 → สรุปทั้งปี) → [คุณลักษณะ → กิจกรรม]
-  // ทั้งชุด: [ปกรายชั้น] แล้วเรียงวิชาตามลำดับในเมนู ข้อมูล → รายวิชา
+  // ---------------------------------------------------------------- พิมพ์ ปพ.5 รายวิชาเป็นเล่ม (แยกเล่มรายวิชา พิมพ์หน้าเดียว)
+  // ลำดับต่อ 1 วิชา: ปกรายวิชา → ข้อมูลนักเรียน → แบบบันทึกคะแนน (ทั้งปี: เทอม 1 → เทอม 2 → สรุปทั้งปี) → [คุณลักษณะ → กิจกรรม]
+  // เรียงวิชาตามลำดับในเมนู ข้อมูล → รายวิชา
   function bookPlan() {
     const B = U.book, all = WB().sheets.map(s => s.name), key = B.term === 'sum' ? 'รวม' : 'เทอม' + B.term;
     const tl = B.term === 'sum' ? 'ทั้งปี' : 'เทอม ' + B.term;
-    const cls = all.find(n => n === 'ปก ปพ.5 รายชั้น ' + key), cover = all.find(n => n === 'ปก ปพ.5 รายวิชา ' + key);
+    const cover = all.find(n => n === 'ปก ปพ.5 รายวิชา ' + key);
     const subs = subjects().filter(s => !B.pick || B.pick.has(s.slot));
     const parts = B.term === 'sum' ? [[1, 'แบบบันทึกคะแนน เทอม 1'], [2, 'แบบบันทึกคะแนน เทอม 2'], ['sum', 'แบบบันทึกคะแนน สรุปทั้งปี']] : [[B.term, 'แบบบันทึกคะแนน เทอม ' + B.term]];
     const assess = B.term === 'sum' ? [[L.traitY, 'คุณลักษณะอันพึงประสงค์ ทั้งปี'], [L.actY, 'กิจกรรมพัฒนาผู้เรียน ทั้งปี']] : [[L.trait(B.term), 'คุณลักษณะอันพึงประสงค์ เทอม ' + B.term], [L.act(B.term), 'กิจกรรมพัฒนาผู้เรียน เทอม ' + B.term]];
-    const groups = [], items = [];
+    const groups = [];
     let page = 0;
-    const add = (g, it, label) => { page++; g.pages.push({ n: page, label }); items.push(it); };
-    const pad = (g) => { if (B.duplex && page % 2) add(g, { blank: true }, 'หน้าว่าง (ให้วิชาถัดไปเริ่มหน้าใหม่ของแผ่น)'); };
-    if (B.cls && cls) { const g = { title: 'หน้าแรกของชุด', pages: [] }; add(g, { sheet: cls }, 'ปก ปพ.5 รายชั้น ' + tl); pad(g); groups.push(g); }
     subs.forEach((s, i) => {
-      const g = { title: `วิชาที่ ${i + 1}: ${oneLine(s.name)}`, pages: [] };
-      if (cover) add(g, { sheet: cover, subj: s.name }, 'ปก ปพ.5 รายวิชา ' + tl);
-      for (const [p, label] of parts) add(g, { sheet: L.score(s.slot), part: p }, label);
-      if (B.assess) for (const [n, label] of assess) if (n) add(g, { sheet: n }, label);
-      if (i < subs.length - 1) pad(g);
+      const g = { title: `เล่มที่ ${i + 1}: ${oneLine(s.name)}`, pages: [], items: [] };
+      const add = (it, label) => { page++; g.pages.push({ n: page, label }); g.items.push(it); };
+      if (cover) add({ sheet: cover, subj: s.name }, 'ปก ปพ.5 รายวิชา ' + tl);
+      add({ stuInfo: s }, 'ข้อมูลนักเรียน');
+      for (const [p, label] of parts) add({ sheet: L.score(s.slot), part: p }, label);
+      if (B.assess) for (const [n, label] of assess) if (n) add({ sheet: n }, label);
       groups.push(g);
     });
-    return { groups, items, subs, total: page };
+    return { groups, subs, total: page };
+  }
+  // หน้า "ข้อมูลนักเรียน" ของเล่มรายวิชา (สร้างจากรายชื่อนักเรียน) — คืน { html, zoom }
+  function stuInfoPage(s) {
+    const stu = students(), sr = s.sr, g = A().S.grade;
+    const teacher = txt(L.sub, sr, 6).trim() || txt(L.info, 5, 2).trim();
+    const code = txt(L.sub, sr, 2).trim(), year = txt(L.info, 9, 2), male = stu.filter(x => x.sex === 'ชาย').length, female = stu.filter(x => x.sex === 'หญิง').length;
+    const clean = (v) => isPh(v) ? '' : v;
+    const rows = stu.map(st => `<tr><td>${esc(st.no)}</td><td class="l">${esc(st.name)}</td><td>${esc(st.sex)}</td><td>${st.att === null || st.att === undefined || st.att === '' ? '' : esc(st.att)}</td><td></td></tr>`).join('');
+    const html = `<div class="pp-stu">
+      <h1>ข้อมูลนักเรียน</h1>
+      <p class="pp-sub">รายวิชา <b>${esc(oneLine(s.name))}</b>${code ? ` &nbsp; รหัสวิชา <b>${esc(code)}</b>` : ''}</p>
+      <p class="pp-sub">ชั้นประถมศึกษาปีที่ ${g} &nbsp; ปีการศึกษา ${esc(year)} &nbsp; ${esc(A().S.school.name)}</p>
+      <p class="pp-sub">ครูผู้สอน ${esc(clean(teacher))}</p>
+      <table><thead><tr><th style="width:9%">เลขที่</th><th>ชื่อ - สกุล</th><th style="width:11%">เพศ</th><th style="width:17%">การเข้าชั้นเรียน (%)</th><th style="width:17%">หมายเหตุ</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="5">ยังไม่มีรายชื่อนักเรียน</td></tr>'}</tbody></table>
+      <p class="pp-sum">นักเรียนทั้งหมด <b>${stu.length}</b> คน &nbsp; ชาย <b>${male}</b> คน &nbsp; หญิง <b>${female}</b> คน</p></div>`;
+    const h = 175 + 25.5 * Math.max(stu.length, 1);   // ความสูงโดยประมาณ (px) — ย่อให้พอดี A4 1 หน้า
+    return { html, zoom: Math.min(1, 1000 / h) };
   }
   function vBook() {
     const all = subjects(), B = U.book;
     if (!all.length) return `<div class="card empty"><b>ยังไม่มีรายวิชา</b><br><button class="btn primary" data-act="goto" data-to="data:subjects">ไปเพิ่มวิชา</button></div>`;
     const plan = bookPlan(), on = (k) => B[k] ? ' checked' : '';
     const picked = (s) => !B.pick || B.pick.has(s.slot);
-    return `<h2>พิมพ์ ปพ.5 รายวิชาเป็นเล่ม</h2><p class="sub">พิมพ์ปกรายวิชาและแบบบันทึกคะแนนของทุกวิชาเรียงเป็นชุดในครั้งเดียว — เลือกวิชาและตัวเลือก แล้วตรวจลำดับหน้าด้านล่างก่อนพิมพ์</p>
+    return `<h2>พิมพ์เล่ม ปพ.5 รายวิชา</h2><p class="sub">พิมพ์เล่ม ปพ.5 แยกตามรายวิชา (หน้าเดียว) ของทุกวิชาเรียงต่อกันในครั้งเดียว — เลือกวิชาและตัวเลือก แล้วตรวจลำดับหน้าด้านล่างก่อนพิมพ์</p>
       <div class="card"><h3>1. ช่วงเวลา</h3>${seg([['sum', 'ทั้งปี (เทอม 1 + เทอม 2)'], [1, 'เทอม 1'], [2, 'เทอม 2']], B.term, 'bterm')}</div>
       <div class="card"><h3>2. เลือกวิชา <span class="hint">(${plan.subs.length} / ${all.length} วิชา)</span></h3>
         <div class="row" style="margin-bottom:8px"><button class="btn sm" data-act="bpick" data-v="all">เลือกทั้งหมด</button><button class="btn sm" data-act="bpick" data-v="none">ไม่เลือกเลย</button></div>
         <div class="bsubs">${all.map(s => `<label class="chk"><input type="checkbox" data-act-change="bsub" value="${s.slot}"${picked(s) ? ' checked' : ''}> ${esc(oneLine(s.name))}</label>`).join('')}</div></div>
       <div class="card"><h3>3. ตัวเลือก</h3>
-        <label class="chk"><input type="checkbox" data-act-change="bopt" value="cls"${on('cls')}> ใส่ <b>ปก ปพ.5 รายชั้น</b> เป็นหน้าแรกของชุด</label>
-        <label class="chk"><input type="checkbox" data-act-change="bopt" value="assess"${on('assess')}> แนบ <b>คุณลักษณะ / กิจกรรมพัฒนาผู้เรียน</b> ท้ายเล่มของทุกวิชา</label>
-        <label class="chk"><input type="checkbox" data-act-change="bopt" value="duplex"${on('duplex')}> พิมพ์ <b>2 หน้า (หน้า-หลัง)</b> — เติมหน้าว่างให้แต่ละวิชาเริ่มที่แผ่นใหม่ แยกเล่มได้</label></div>
-      <div class="card"><div class="row sp"><h3 style="margin:0">ลำดับหน้าการพิมพ์ <span class="hint">รวม ${plan.total} หน้า</span></h3>
-        <button class="btn primary" data-act="book-print"${plan.subs.length ? '' : ' disabled'}>🖨 พิมพ์เล่ม ปพ.5 (${plan.total} หน้า)</button></div>
-        <div class="border-top" style="margin-top:10px">${plan.groups.map(g => `<div class="bgrp"><b>${esc(g.title)}</b><ol class="bpages">${g.pages.map(p => `<li value="${p.n}"${/^หน้าว่าง/.test(p.label) ? ' class="hint"' : ''}>${esc(p.label)}</li>`).join('')}</ol></div>`).join('') || '<p class="hint">ยังไม่ได้เลือกวิชา</p>'}</div>
-        <p class="hint">ทุกหน้าเป็นกระดาษ A4 แนวตั้ง · ในหน้าต่างพิมพ์ เลือก “บันทึกเป็น PDF” เพื่อเก็บเป็นไฟล์ได้ · ถ้าพิมพ์ 2 หน้า ให้ตั้งค่าเครื่องพิมพ์เป็น “พิมพ์สองด้าน (พลิกด้านยาว)”</p></div>`;
+        <label class="chk"><input type="checkbox" data-act-change="bopt" value="assess"${on('assess')}> แนบ <b>คุณลักษณะ / กิจกรรมพัฒนาผู้เรียน</b> ท้ายเล่มของทุกวิชา</label></div>
+      <div class="card"><div class="row sp"><h3 style="margin:0">ลำดับหน้าการพิมพ์ <span class="hint">${plan.subs.length} เล่ม · รวม ${plan.total} หน้า</span></h3>
+        <button class="btn primary" data-act="book-print"${plan.subs.length ? '' : ' disabled'}>🖨 พิมพ์เล่ม ปพ.5 รายวิชา (${plan.total} หน้า)</button></div>
+        <div style="margin-top:10px">${plan.groups.map(g => `<div class="bgrp"><b>${esc(g.title)}</b><ol class="bpages">${g.pages.map(p => `<li value="${p.n}">${esc(p.label)}</li>`).join('')}</ol></div>`).join('') || '<p class="hint">ยังไม่ได้เลือกวิชา</p>'}</div>
+        <p class="hint">ทุกหน้าเป็นกระดาษ A4 แนวตั้ง พิมพ์หน้าเดียว · ในหน้าต่างพิมพ์ เลือก “บันทึกเป็น PDF” เพื่อเก็บเป็นไฟล์ได้</p></div>`;
+  }
+  function bookPrint() {
+    const items = bookPlan().groups.flatMap(g => g.items).map(it => it.stuInfo ? stuInfoPage(it.stuInfo) : it);
+    if (items.length) A().printSet(items);
   }
 
   // ---------------------------------------------------------------- แบบฟอร์ม Excel (กรอกใน Excel แล้วคัดลอกมาวางในตาราง)
@@ -882,13 +900,13 @@
       <li><b>รายงาน ปพ.6:</b> ดูผลรายคน (เลือกนักเรียน) หรือภาพรวมทั้งห้อง ของเทอม 1 / เทอม 2 / ทั้งปี</li>
       <li>ชั้น ป.3 และ ป.6 มีหน้า <b>สรุปประถมตอนต้น / ตอนปลาย</b> เทียบผลกับระดับที่คาดหวัง</li>
       <li>กด <b>พิมพ์ ปพ.6 คนนี้</b> หรือ <b>พิมพ์ทั้งห้อง</b> (คนละ 2 หน้า: ผลการเรียน + คำอธิบายพฤติกรรม)</li></ul>`],
-    ['book', 'พิมพ์ ปพ.5 รายวิชาเป็นเล่ม', 'book', `
-      <p>เมนู <b>พิมพ์เล่ม ปพ.5</b> พิมพ์เอกสาร ปพ.5 ของทุกวิชาเรียงเป็นชุดในครั้งเดียว</p>
+    ['book', 'พิมพ์เล่ม ปพ.5 รายวิชา', 'book', `
+      <p>เมนู <b>พิมพ์เล่ม ปพ.5</b> พิมพ์เล่ม ปพ.5 แยกตามรายวิชา (พิมพ์หน้าเดียว) ของทุกวิชาเรียงต่อกันในครั้งเดียว</p>
       <ol><li>เลือกช่วงเวลา: <b>ทั้งปี</b> / <b>เทอม 1</b> / <b>เทอม 2</b></li>
       <li>เลือกวิชาที่ต้องการ (ค่าเริ่มต้น = ทุกวิชา)</li>
-      <li>ตัวเลือก: ใส่ปกรายชั้นหน้าแรก · แนบคุณลักษณะ/กิจกรรมท้ายแต่ละวิชา · พิมพ์ 2 หน้า (เติมหน้าว่างให้แต่ละวิชาเริ่มแผ่นใหม่)</li>
-      <li>ตรวจ <b>ลำดับหน้าการพิมพ์</b> ที่แสดงด้านล่าง แล้วกด <b>พิมพ์เล่ม ปพ.5</b></li></ol>
-      <p class="hint">ลำดับต่อ 1 วิชา (ทั้งปี): ปกรายวิชา → คะแนนเทอม 1 → คะแนนเทอม 2 → สรุปทั้งปี [→ คุณลักษณะ → กิจกรรม] · เรียงวิชาตามลำดับในเมนู ข้อมูล → รายวิชา</p>`],
+      <li>ถ้าต้องการ ติ๊กแนบคุณลักษณะ / กิจกรรมพัฒนาผู้เรียนท้ายเล่ม</li>
+      <li>ตรวจ <b>ลำดับหน้าการพิมพ์</b> ที่แสดงด้านล่าง แล้วกด <b>พิมพ์เล่ม ปพ.5 รายวิชา</b></li></ol>
+      <p class="hint">ลำดับต่อ 1 เล่ม (ทั้งปี): ปกรายวิชา → ข้อมูลนักเรียน → คะแนนเทอม 1 → คะแนนเทอม 2 → สรุปทั้งปี [→ คุณลักษณะ → กิจกรรม] · เรียงวิชาตามลำดับในเมนู ข้อมูล → รายวิชา</p>`],
     ['print', 'พิมพ์เอกสาร / บันทึกเป็น PDF', 'docs', `
       <p>เมนู <b>ปริ้นเอกสาร</b> รวมแบบฟอร์มทางการทุกฉบับ — กดชื่อเอกสารเพื่อดูตัวอย่าง หรือกด <b>พิมพ์</b></p>
       <ul><li><b>แบบบันทึกคะแนนรายวิชา:</b> พิมพ์ครบ 3 หน้า หรือแยก <b>ท.1 / ท.2 / รวม</b> และพิมพ์ทุกวิชาพร้อมกันได้</li>
@@ -960,7 +978,7 @@
       case 'backup-out': A().exportBackup(); break;
       case 'xlform': xlForm(b.dataset.k); break;
       case 'bpick': U.book.pick = b.dataset.v === 'all' ? null : new Set(); refresh(); break;
-      case 'book-print': { const plan = bookPlan(); if (plan.items.length) A().printSet(plan.items); break; }
+      case 'book-print': bookPrint(); break;
       case 'man-go': { const d = $('#man-' + b.dataset.id); if (d) { d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'start' }); } break; }
       case 'backup-in': A().pickBackup(); break;
       case 'print-score': A().printScores(b.dataset.n === '*' ? subjects().map(s => L.score(s.slot)) : [b.dataset.n], b.dataset.part); break;
