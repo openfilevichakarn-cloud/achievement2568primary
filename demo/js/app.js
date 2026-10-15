@@ -78,7 +78,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ป.' + g + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261015j');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261015k');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -500,11 +500,14 @@
   // พิมพ์หลายเอกสารรวดเดียว: items = [{ sheet, subj? }] (subj = วิชาที่ให้หน้าปก ปพ.5 รายวิชา แสดง)
   const SUBJ_CELL = { r: 6, c: 18 };   // ปก ปพ.5 รายวิชา!R6
   function setCoverSubject(sheet, subj) { S.wb.setValue(sheet, SUBJ_CELL, subj); }
+  // items = [{ sheet, subj?, part? } | { blank: true }]  (blank = หน้าว่าง สำหรับพิมพ์ 2 หน้าให้แต่ละวิชาเริ่มหน้าขวา)
+  const BLANK = { html: '', zoom: 1, land: false, m: [0.7, 0.7, 0.75, 0.75], hc: false, vc: false };
   async function printSet(items) {
-    items = items.filter(x => x && S.wb.sheet(x.sheet));
-    if (!items.length) { toast('ไม่มีเอกสารให้พิมพ์', 'warn'); return; }
+    items = items.filter(x => x && (x.blank || S.wb.sheet(x.sheet)));
+    if (!items.some(x => !x.blank)) { toast('ไม่มีเอกสารให้พิมพ์', 'warn'); return; }
     const old = {}; const blocks = [];
     for (const it of items) {
+      if (it.blank) { blocks.push(BLANK); continue; }
       if (it.subj !== undefined) { if (!(it.sheet in old)) old[it.sheet] = S.wb.get(S.wb.sheet(it.sheet), SUBJ_CELL.r, SUBJ_CELL.c); setCoverSubject(it.sheet, it.subj); }
       blocks.push(...blocksFor(it.sheet, it.part));
     }
