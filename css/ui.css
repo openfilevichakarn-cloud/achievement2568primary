@@ -249,3 +249,17 @@ table.p5t .warnc{color:var(--warn);font-weight:600}
 .lvn.l2,.lvh.l2{color:var(--lv2)} .lvn.l2{background:var(--lv2bg)}
 .lvn.l3,.lvh.l3{color:var(--lv3)} .lvn.l3{background:var(--lv3bg)}
 .p5h{margin:18px 0 4px}
+
+/* แถบเมนู: สีประจำแต่ละเมนู (ไอคอนเป็นสีเสมอ เมนูที่เลือกมีพื้นสีอ่อน) */
+.tabbar .t-home{--tc:#2563eb} .tabbar .t-data{--tc:#0891b2} .tabbar .t-scores{--tc:#ea580c} .tabbar .t-assess{--tc:#16a34a}
+.tabbar .t-report5{--tc:#7c3aed} .tabbar .t-report{--tc:#db2777} .tabbar .t-docs{--tc:#ca8a04}
+.tabbar button{color:color-mix(in srgb,var(--tc) 80%,var(--muted))}
+.tabbar button svg{color:var(--tc)}
+.tabbar button.on{color:var(--tc);background:color-mix(in srgb,var(--tc) 13%,transparent);border-radius:12px}
+.tabbar button{border-radius:12px;transition:background .15s}
+.tabbar button:hover{background:color-mix(in srgb,var(--tc) 8%,transparent)}
+@media (max-width:899px){ .tabbar{padding:4px 2px;gap:2px} .tabbar button{font-size:.7rem} .tabbar button svg{width:22px;height:22px} }
+@media (prefers-color-scheme: dark){
+  .tabbar .t-home{--tc:#60a5fa} .tabbar .t-data{--tc:#22d3ee} .tabbar .t-scores{--tc:#fb923c} .tabbar .t-assess{--tc:#4ade80}
+  .tabbar .t-report5{--tc:#a78bfa} .tabbar .t-report{--tc:#f472b6} .tabbar .t-docs{--tc:#facc15}
+}

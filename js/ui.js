@@ -98,11 +98,12 @@
     scores: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>',
     assess: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>',
     report: '<path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/>',
+    docs: '<path d="M7 8V3h10v5"/><rect x="3" y="8" width="18" height="9" rx="2"/><path d="M7 14h10v7H7z"/><path d="M17 11.5h.01"/>',
     report5: '<path d="M5 4h6a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H5z"/><path d="M19 4h-5a3 3 0 0 0-3 3"/><path d="M19 4v14h-5"/>',
   };
-  const TABS = [['home', 'หน้าแรก'], ['data', 'ข้อมูล'], ['scores', 'คะแนน'], ['assess', 'ประเมิน'], ['report5', 'รายงาน ปพ.5'], ['report', 'รายงาน ปพ.6']];
+  const TABS = [['home', 'หน้าแรก'], ['data', 'ข้อมูล'], ['scores', 'คะแนน'], ['assess', 'ประเมิน'], ['report5', 'รายงาน ปพ.5'], ['report', 'รายงาน ปพ.6'], ['docs', 'ปริ้นเอกสาร']];
   function renderTabbar() {
-    $('#tabbar').innerHTML = TABS.map(([k, t]) => `<button data-tab="${k}" class="${U.tab === k ? 'on' : ''}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg>${t}</button>`).join('');
+    $('#tabbar').innerHTML = TABS.map(([k, t]) => `<button data-tab="${k}" class="t-${k}${U.tab === k ? ' on' : ''}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg>${t}</button>`).join('');
   }
   function mount() {
     buildLayout();
