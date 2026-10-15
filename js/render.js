@@ -4,10 +4,12 @@
   const P = root.PPEngine;
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+  // ความหนาเส้นอิง --bw (= 1px ÷ อัตราซูม) ให้เส้นบางเท่าเดิมไม่ว่าจะซูมดู/พิมพ์ขนาดใด
+  const W1 = 'var(--bw,1px)', W2 = 'calc(var(--bw,1px)*2)', W3 = 'calc(var(--bw,1px)*3)';
   const BSTYLE = {
-    thin: '1px solid', hair: '1px dotted', dotted: '1px dotted', dashed: '1px dashed', dashDot: '1px dashed', dashDotDot: '1px dashed',
-    medium: '2px solid', mediumDashed: '2px dashed', mediumDashDot: '2px dashed', mediumDashDotDot: '2px dashed', slantDashDot: '2px dashed',
-    thick: '3px solid', double: '3px double'
+    thin: W1 + ' solid', hair: W1 + ' dotted', dotted: W1 + ' dotted', dashed: W1 + ' dashed', dashDot: W1 + ' dashed', dashDotDot: W1 + ' dashed',
+    medium: W2 + ' solid', mediumDashed: W2 + ' dashed', mediumDashDot: W2 + ' dashed', mediumDashDotDot: W2 + ' dashed', slantDashDot: W2 + ' dashed',
+    thick: W3 + ' solid', double: W3 + ' double'
   };
   const FONT_STACK = "'TH Sarabun New','Sarabun','Noto Sans Thai',sans-serif";
 
@@ -20,7 +22,7 @@
       if (f[4] && f[4] !== 'none') css += 'text-decoration:underline;';
       if (s.bg) css += `background:${s.bg};`;
       const [l, r, t, b] = s.b;
-      const side = (x, n) => x ? `border-${n}:${BSTYLE[x[0]] || '1px solid'} ${x[1]};` : '';
+      const side = (x, n) => x ? `border-${n}:${BSTYLE[x[0]] || BSTYLE.thin} ${x[1]};` : '';
       css += side(l, 'left') + side(r, 'right') + side(t, 'top') + side(b, 'bottom');
       const h = a[0], v = a[1];
       if (h === 'center' || h === 'centerContinuous') css += 'text-align:center;'; else if (h === 'right') css += 'text-align:right;'; else if (h === 'left') css += 'text-align:left;'; else if (h === 'justify') css += 'text-align:justify;';
@@ -82,12 +84,18 @@
     if (opts.area) { const a = parseRange(opts.area); if (a) { r1 = a.r1; c1 = a.c1; r2 = a.r2; c2 = a.c2; } }
     // merges
     const anchors = new Map(), covered = new Set();
-    for (const m of d.merges) {
+    const merges = (view && view.mergeOv && view.mergeOv[sheetName]) || d.merges;   // ผสานเซลล์แบบปรับตามข้อมูล (เช่น ลายเซ็น)
+    const colHidden = (c) => {
+      const ov = view && view.colHidden && view.colHidden(sheetName, c);   // true/false = บังคับ, undefined = ตามไฟล์
+      return ov !== undefined ? ov : !!(d.cw[c] && d.cw[c].h);
+    };
+    for (const m of merges) {
       const a = parseRange(m); if (!a) continue;
-      anchors.set(P.KEY(a.r1, a.c1), a);
-      for (let r = a.r1; r <= a.r2; r++) for (let c = a.c1; c <= a.c2; c++) if (r !== a.r1 || c !== a.c1) covered.add(P.KEY(r, c));
+      // ถ้าคอลัมน์ต้นของช่องผสานถูกซ่อน ให้แสดงเนื้อหาที่คอลัมน์แรกที่มองเห็นในช่วงนั้นแทน
+      let ac = a.c1; while (ac < a.c2 && colHidden(ac)) ac++;
+      anchors.set(P.KEY(a.r1, ac), { ...a, src: a.c1 });
+      for (let r = a.r1; r <= a.r2; r++) for (let c = a.c1; c <= a.c2; c++) if (r !== a.r1 || c !== ac) covered.add(P.KEY(r, c));
     }
-    const colHidden = (c) => d.cw[c] && d.cw[c].h;
     const rowHidden = (r) => {
       const ov = view && view.rowHidden && view.rowHidden[sheetName];
       if (ov && ov.has(r)) return ov.get(r);
@@ -130,9 +138,10 @@
         if (colHidden(c)) continue;
         const key = P.KEY(r, c);
         if (covered.has(key)) continue;
-        const cell = sh.cells.get(key);
-        const si = cell ? cell.s : -1; const st = cell ? styles[si] : null;
         const a = anchors.get(key);
+        const sc = a ? a.src : c;   // คอลัมน์ต้นทางของเนื้อหา (ต่างจาก c เมื่อช่องผสานถูกย้ายจุดแสดง)
+        const cell = sh.cells.get(P.KEY(r, sc));
+        const si = cell ? cell.s : -1; const st = cell ? styles[si] : null;
         let attrs = '', cls = cell ? 's' + si : 'sx';
         if (a) {
           let cs = 0, rs = 0;
@@ -140,7 +149,7 @@
           for (let rr = a.r1; rr <= a.r2; rr++) if (!rowHidden(rr) && rr <= r2) rs++;
           if (cs > 1) attrs += ` colspan="${cs}"`; if (rs > 1) attrs += ` rowspan="${rs}"`;
         }
-        let v = wb.get(sh, r, c); if (v && v.isRange) v = wb.scalar(v);
+        let v = wb.get(sh, r, sc); if (v && v.isRange) v = wb.scalar(v);
         const editable = !!(cell && cell.u) && edit && !(view && view.locked && view.locked.has(sheetName + '!' + P.numToCol(c) + r));
         if (editable) cls += ' inp';
         const sp = [];
@@ -150,7 +159,7 @@
         if (a && (a.c2 > a.c1 || a.r2 > a.r1)) {
           const edge = (rr, cc) => { const x = sh.cells.get(P.KEY(rr, cc)); return x ? styles[x.s] : null; };
           const sr = edge(a.r1, a.c2), sb = edge(a.r2, a.c1);
-          const mk = (x, n) => x ? `border-${n}:${BSTYLE[x[0]] || '1px solid'} ${x[1]}` : null;
+          const mk = (x, n) => x ? `border-${n}:${BSTYLE[x[0]] || BSTYLE.thin} ${x[1]}` : null;
           if (sr && mk(sr.b[1], 'right')) sp.push(mk(sr.b[1], 'right'));
           if (sb && mk(sb.b[3], 'bottom')) sp.push(mk(sb.b[3], 'bottom'));
         }

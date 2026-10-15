@@ -1,0 +1,30 @@
+# กันโปรเจกต์ Supabase แบบฟรีหยุดอัตโนมัติ (หยุดเมื่อไม่มีการใช้งาน 7 วัน)
+# เรียกฟังก์ชัน public.ping() ทุก 3 วัน — ต้องรัน sql/keepalive.sql ใน Supabase ก่อน 1 ครั้ง
+# ใช้ URL และ anon key จาก js/config.js (anon key เปิดเผยได้อยู่แล้ว) ไม่ต้องตั้ง secret
+# หมายเหตุ: GitHub จะรันงานตามเวลาเฉพาะไฟล์นี้ที่อยู่ใน branch หลัก (main) เท่านั้น
+name: Supabase keep-alive
+on:
+  schedule:
+    - cron: '17 2 */3 * *'   # ทุก 3 วัน เวลา 09:17 น. (ไทย)
+  workflow_dispatch: {}        # กดรันเองได้ที่แท็บ Actions
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: js/config.js
+          sparse-checkout-cone-mode: false
+      - name: Ping Supabase
+        run: |
+          URL=$(grep -oP "SUPABASE_URL:\s*'\K[^']+" js/config.js)
+          KEY=$(grep -oP "SUPABASE_ANON_KEY:\s*'\K[^']+" js/config.js)
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then echo "ยังไม่ได้ตั้งค่า Supabase ใน js/config.js"; exit 0; fi
+          for i in 1 2 3; do
+            code=$(curl -s -o out.json -w '%{http_code}' -X POST "$URL/rest/v1/rpc/ping" \
+              -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{}')
+            cat out.json; echo
+            [ "$code" = "200" ] && exit 0
+            echo "HTTP $code — ลองใหม่"; sleep 20
+          done
+          echo "::error::เรียก Supabase ไม่สำเร็จ (ตรวจว่ารัน sql/keepalive.sql แล้ว และโปรเจกต์ไม่ถูกหยุดอยู่)"; exit 1

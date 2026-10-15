@@ -160,8 +160,157 @@ grant execute on function public.app_load(text, smallint) to anon, authenticated
 grant execute on function public.app_save(text, smallint, jsonb, integer, boolean) to anon, authenticated;
 
 -- =====================================================================
---  วิธีบริหารโรงเรียน (รันทีละคำสั่งใน SQL Editor)
+--  หน้าผู้ดูแล (admin.html): ออกรหัส / ดูรายชื่อ / รีเซ็ตรหัส / แก้ไข ด้วยการกดปุ่ม
+--  * ทุกฟังก์ชันต้องแนบ "รหัสผ่านผู้ดูแล" (เก็บเป็น bcrypt ในตาราง admin_auth)
+--  * ผิดเกิน 10 ครั้ง/10 นาที ต่อ IP จะถูกระงับชั่วคราว
+--  * ตั้ง/เปลี่ยนรหัสผ่านผู้ดูแลได้เฉพาะใน SQL Editor:  select public.set_admin_password('รหัสผ่านยาวๆ');
 -- =====================================================================
+create table if not exists public.admin_auth (
+  id          smallint primary key default 1 check (id = 1),
+  pass_hash   text not null,
+  updated_at  timestamptz not null default now()
+);
+create table if not exists public.admin_attempts (
+  id    bigserial primary key,
+  ip    text not null,
+  at    timestamptz not null default now()
+);
+create index if not exists admin_attempts_ip_at on public.admin_attempts (ip, at);
+alter table public.admin_auth     enable row level security;
+alter table public.admin_attempts enable row level security;
+revoke all on public.admin_auth, public.admin_attempts from anon, authenticated;
+revoke all on sequence public.admin_attempts_id_seq from anon, authenticated;
+
+create or replace function public.set_admin_password(p_pass text) returns text
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+begin
+  if length(coalesce(p_pass, '')) < 10 then raise exception 'รหัสผ่านผู้ดูแลต้องยาวอย่างน้อย 10 ตัวอักษร'; end if;
+  insert into public.admin_auth(id, pass_hash) values (1, extensions.crypt(p_pass, extensions.gen_salt('bf', 10)))
+  on conflict (id) do update set pass_hash = excluded.pass_hash, updated_at = now();
+  return 'ตั้งรหัสผ่านผู้ดูแลแล้ว';
+end $$;
+
+-- ตรวจรหัสผ่านผู้ดูแล (true/false) พร้อมจำกัดจำนวนครั้งที่ผิด
+create or replace function public._admin_ok(p_pass text) returns boolean
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+declare h text; v_ip text := public._client_ip();
+begin
+  if (select count(*) from public.admin_attempts where ip = v_ip and at > now() - interval '10 minutes') >= 10 then return false; end if;
+  select pass_hash into h from public.admin_auth where id = 1;
+  if h is not null and extensions.crypt(coalesce(p_pass, ''), h) = h then return true; end if;
+  insert into public.admin_attempts(ip) values (v_ip);
+  delete from public.admin_attempts where at < now() - interval '1 day';
+  return false;
+end $$;
+
+create or replace function public._new_code() returns text
+language plpgsql volatile
+set search_path = public, extensions
+as $$
+declare raw text := upper(encode(extensions.gen_random_bytes(8), 'hex'));
+begin
+  return substr(raw,1,4)||'-'||substr(raw,5,4)||'-'||substr(raw,9,4)||'-'||substr(raw,13,4);
+end $$;
+
+create or replace function public._clean_grades(p_grades smallint[]) returns smallint[]
+language sql immutable
+as $$ select coalesce(array_agg(distinct g order by g), '{1}') from unnest(coalesce(p_grades, '{1}')) g where g between 1 and 6 $$;
+
+create or replace function public.admin_login(p_pass text) returns jsonb
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+begin
+  if not public._admin_ok(p_pass) then return jsonb_build_object('ok', false, 'error', 'รหัสผ่านผู้ดูแลไม่ถูกต้อง หรือพยายามผิดหลายครั้ง (รอ 10 นาที)'); end if;
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- รายชื่อโรงเรียนทั้งหมด + การบันทึกล่าสุดของแต่ละชั้น
+create or replace function public.admin_list(p_pass text) returns jsonb
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+begin
+  if not public._admin_ok(p_pass) then return jsonb_build_object('ok', false, 'error', 'รหัสผ่านผู้ดูแลไม่ถูกต้อง'); end if;
+  return jsonb_build_object('ok', true, 'schools', coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'id', s.id, 'name', s.name, 'grades', to_jsonb(s.grades), 'active', s.active, 'note', s.note, 'created_at', s.created_at,
+      'saves', coalesce((select jsonb_agg(jsonb_build_object('grade', d.grade, 'version', d.version, 'updated_at', d.updated_at) order by d.grade)
+                         from public.school_data d where d.school_id = s.id), '[]'::jsonb)
+    ) order by s.created_at desc)
+    from public.schools s), '[]'::jsonb));
+end $$;
+
+-- ออกรหัสให้โรงเรียนใหม่ (หลายโรงเรียนพร้อมกันได้) คืนรหัส (แสดงครั้งเดียว ระบบเก็บเฉพาะ hash)
+create or replace function public.admin_issue(p_pass text, p_names text[], p_grades smallint[] default '{1}', p_note text default null) returns jsonb
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+declare n text; code text; out jsonb := '[]'::jsonb; sid uuid;
+begin
+  if not public._admin_ok(p_pass) then return jsonb_build_object('ok', false, 'error', 'รหัสผ่านผู้ดูแลไม่ถูกต้อง'); end if;
+  if coalesce(array_length(p_names, 1), 0) = 0 then return jsonb_build_object('ok', false, 'error', 'กรุณากรอกชื่อโรงเรียน'); end if;
+  if array_length(p_names, 1) > 200 then return jsonb_build_object('ok', false, 'error', 'ออกได้ครั้งละไม่เกิน 200 โรงเรียน'); end if;
+  foreach n in array p_names loop
+    n := btrim(coalesce(n, ''));
+    continue when n = '';
+    code := public._new_code();
+    insert into public.schools(name, code_hash, grades, note) values (n, public._code_hash(code), public._clean_grades(p_grades), nullif(btrim(coalesce(p_note, '')), ''))
+    returning id into sid;
+    out := out || jsonb_build_object('id', sid, 'name', n, 'code', code);
+  end loop;
+  return jsonb_build_object('ok', true, 'issued', out);
+end $$;
+
+-- ออกรหัสใหม่ (รหัสเดิมใช้ไม่ได้ทันที) ข้อมูลของโรงเรียนยังอยู่ครบ
+create or replace function public.admin_reset(p_pass text, p_id uuid) returns jsonb
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+declare code text := public._new_code();
+begin
+  if not public._admin_ok(p_pass) then return jsonb_build_object('ok', false, 'error', 'รหัสผ่านผู้ดูแลไม่ถูกต้อง'); end if;
+  update public.schools set code_hash = public._code_hash(code) where id = p_id;
+  if not found then return jsonb_build_object('ok', false, 'error', 'ไม่พบโรงเรียน'); end if;
+  return jsonb_build_object('ok', true, 'code', code);
+end $$;
+
+-- แก้ชื่อ / ชั้นที่ใช้ได้ / สถานะ / หมายเหตุ (ส่ง null = ไม่เปลี่ยน)
+create or replace function public.admin_update(p_pass text, p_id uuid, p_name text default null, p_grades smallint[] default null, p_active boolean default null, p_note text default null) returns jsonb
+language plpgsql security definer
+set search_path = public, extensions
+as $$
+begin
+  if not public._admin_ok(p_pass) then return jsonb_build_object('ok', false, 'error', 'รหัสผ่านผู้ดูแลไม่ถูกต้อง'); end if;
+  if p_name is not null and btrim(p_name) = '' then return jsonb_build_object('ok', false, 'error', 'ชื่อโรงเรียนว่างไม่ได้'); end if;
+  update public.schools set
+    name   = coalesce(nullif(btrim(p_name), ''), name),
+    grades = case when p_grades is null then grades else public._clean_grades(p_grades) end,
+    active = coalesce(p_active, active),
+    note   = case when p_note is null then note else nullif(btrim(p_note), '') end
+   where id = p_id;
+  if not found then return jsonb_build_object('ok', false, 'error', 'ไม่พบโรงเรียน'); end if;
+  return jsonb_build_object('ok', true);
+end $$;
+
+revoke all on function public.set_admin_password(text), public._admin_ok(text), public._new_code(), public._clean_grades(smallint[]),
+  public.admin_login(text), public.admin_list(text), public.admin_issue(text, text[], smallint[], text),
+  public.admin_reset(text, uuid), public.admin_update(text, uuid, text, smallint[], boolean, text)
+  from public, anon, authenticated;
+grant execute on function public.admin_login(text) to anon, authenticated;
+grant execute on function public.admin_list(text) to anon, authenticated;
+grant execute on function public.admin_issue(text, text[], smallint[], text) to anon, authenticated;
+grant execute on function public.admin_reset(text, uuid) to anon, authenticated;
+grant execute on function public.admin_update(text, uuid, text, smallint[], boolean, text) to anon, authenticated;
+
+-- =====================================================================
+--  วิธีบริหารโรงเรียน (รันทีละคำสั่งใน SQL Editor) — หรือใช้หน้า admin.html หลังตั้งรหัสผ่านผู้ดูแล
+-- =====================================================================
+--  ตั้งรหัสผ่านหน้าผู้ดูแล (ครั้งแรก): select public.set_admin_password('รหัสผ่านยาวอย่างน้อย10ตัว');
 --  ออกสิทธิ์ ป.1 ให้โรงเรียนใหม่:     select public.issue_school('โรงเรียนบ้านตัวอย่าง');
 --  ออกสิทธิ์ ป.1–ป.3:                select public.issue_school('โรงเรียนบ้านตัวอย่าง', '{1,2,3}');
 --  ดูรายชื่อโรงเรียน:                select id, name, grades, active, created_at from public.schools order by created_at desc;
@@ -170,3 +319,14 @@ grant execute on function public.app_save(text, smallint, jsonb, integer, boolea
 --  ออกรหัสใหม่ (รหัสเดิมใช้ไม่ได้):     select public.reset_school_code('...');
 --  ระงับสิทธิ์:                       update public.schools set active = false where id = '...';
 --  ดูว่าโรงเรียนไหนบันทึกล่าสุด:       select s.name, d.grade, d.version, d.updated_at from public.school_data d join public.schools s on s.id = d.school_id order by d.updated_at desc;
+
+-- ---------- กันโปรเจกต์ Supabase แบบฟรีหยุดอัตโนมัติ (เรียกจาก .github/workflows/keepalive.yml ทุก 3 วัน) ----------
+create or replace function public.ping() returns jsonb
+language plpgsql security definer
+set search_path = public
+as $$
+begin
+  perform 1 from public.schools limit 1;   -- แตะฐานข้อมูลจริง (ไม่เปิดเผยข้อมูลใด ๆ)
+  return jsonb_build_object('ok', true, 'at', now());
+end $$;
+grant execute on function public.ping() to anon, authenticated;

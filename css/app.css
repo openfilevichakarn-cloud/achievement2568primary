@@ -7,12 +7,11 @@
   --bg:#f4f5f7; --panel:#fff; --ink:#1d2433; --muted:#667085; --line:#d9dde5; --brand:#1f5eff; --brand-ink:#fff;
   --ok:#0a7a45; --warn:#b45309; --err:#c0262d; --nav:#fbfbfd; --shadow:0 1px 2px rgba(16,24,40,.08),0 4px 14px rgba(16,24,40,.06);
 }
-@media (prefers-color-scheme: dark){
-  :root{ --bg:#14171d; --panel:#1c212b; --ink:#e8ebf2; --muted:#98a2b3; --line:#2d3544; --brand:#6b93ff; --brand-ink:#0b1020; --nav:#181c25; --ok:#4ade80; --warn:#fbbf24; --err:#f87171; }
-}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){ --bg:#14171d; --panel:#1c212b; --ink:#e8ebf2; --muted:#98a2b3; --line:#2d3544; --brand:#6b93ff; --brand-ink:#0b1020; --nav:#181c25; --ok:#4ade80; --warn:#fbbf24; --err:#f87171; }}
+:root[data-theme="dark"]{ --bg:#14171d; --panel:#1c212b; --ink:#e8ebf2; --muted:#98a2b3; --line:#2d3544; --brand:#6b93ff; --brand-ink:#0b1020; --nav:#181c25; --ok:#4ade80; --warn:#fbbf24; --err:#f87171; }
 *{box-sizing:border-box}
 html,body{height:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 'Sarabun','TH Sarabun New',system-ui,sans-serif}
+body{margin:0;background:var(--bg);color:var(--ink);font:1rem/1.45 'Sarabun','TH Sarabun New',system-ui,sans-serif}
 button,input,select{font:inherit;color:inherit}
 .grow{flex:1}
 .btn{border:1px solid var(--line);background:var(--panel);padding:.35rem .85rem;border-radius:8px;cursor:pointer;min-height:36px}
@@ -24,7 +23,13 @@ button,input,select{font:inherit;color:inherit}
 .icon{background:none;border:0;font-size:1.4rem;cursor:pointer;display:none;padding:.2rem .5rem}
 
 /* login */
-.login{min-height:100%;display:grid;place-items:center;padding:24px 16px}
+.login{min-height:100%;display:grid;place-items:center;padding:24px 16px;background:#eef4fb url('../img/login-bg.webp') center/cover no-repeat}
+.login{position:relative}
+.login .login-card{background:color-mix(in srgb,var(--panel) 88%,transparent);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);box-shadow:0 18px 50px rgba(20,60,140,.18);border-color:color-mix(in srgb,var(--panel) 70%,transparent);color:var(--ink)}
+/* ปุ่มสลับโหมดมืด/สว่าง */
+.theme-fab{position:absolute;top:max(14px,env(safe-area-inset-top));right:14px;width:44px;height:44px;padding:0;border-radius:99px;font-size:1.2rem;background:color-mix(in srgb,var(--panel) 85%,transparent);box-shadow:var(--shadow);z-index:2}
+.theme-btn{min-width:40px;padding:.3rem .5rem !important;font-size:1.05rem}
+@media (max-width:700px){.login{background-position:18% bottom}}
 .login-card{background:var(--panel);width:min(440px,100%);padding:28px;border-radius:16px;box-shadow:var(--shadow);border:1px solid var(--line)}
 .login-card h1{font-size:1.5rem;margin:0 0 .5rem;line-height:1.25}
 .login-card h1 small{font-size:.95rem;font-weight:400;color:var(--muted)}
@@ -36,6 +41,8 @@ button,input,select{font:inherit;color:inherit}
 .err{color:var(--err);min-height:1.4em;margin:.5rem 0 0}
 .demo{background:color-mix(in srgb,var(--warn) 12%,transparent);border:1px solid var(--warn);padding:.5rem .7rem;border-radius:8px;font-size:.92rem}
 .fine{color:var(--muted);font-size:.8rem;margin:1rem 0 0;text-align:center}
+.fine a{color:var(--brand);font-weight:600;white-space:nowrap}
+.nw{white-space:nowrap}
 
 /* app shell */
 #app{height:100%;display:flex;flex-direction:column}
@@ -97,6 +104,13 @@ td .rot{white-space:nowrap}
   .brand{font-size:1rem;max-width:42vw;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 }
 
+/* ===== ลายน้ำ (เว็บตัวอย่าง) ===== */
+.wm-layer{position:fixed;inset:-30%;z-index:9000;pointer-events:none;user-select:none;display:flex;flex-wrap:wrap;align-content:space-around;justify-content:space-around;gap:110px 140px;transform:rotate(-28deg);overflow:hidden}
+.wm-layer span{font:700 34px/1 'Sarabun',sans-serif;color:rgba(220,38,38,.11);white-space:nowrap}
+.pp-page{position:relative}
+.pp-page .wm-layer{position:absolute;inset:-25%;gap:150px 120px;z-index:5}
+.pp-page .wm-layer span{font-size:46px;color:rgba(220,38,38,.13)}
+
 /* ===== พิมพ์ ===== */
 #print-root{display:none}
 @page { margin: 0; }
@@ -108,6 +122,7 @@ td .rot{white-space:nowrap}
   body{background:#fff}
   .pp-page{page-break-after:always;break-after:page;box-sizing:border-box;overflow:hidden}
   .pp-page:last-child{page-break-after:auto;break-after:auto}
+  .pp-page.vc{display:flex;flex-direction:column;justify-content:center}
   .pp-page.land{page:land;width:297mm;height:210mm}
   .pp-page.port{page:port;width:210mm;height:297mm}
   table.xl{background:#fff} table.xl td{border-color:inherit}
@@ -117,3 +132,6 @@ td .rot{white-space:nowrap}
 .xlbox{position:relative}.xlshape{position:absolute;box-sizing:border-box;pointer-events:none}
 img.logo.ov{position:absolute;object-fit:contain;pointer-events:none}
 table.xl td.sx{font-family:'TH Sarabun New','Sarabun',sans-serif}
+/* โหมดมืด: หรี่ภาพพื้นหลังหน้าเข้าสู่ระบบ */
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .login{background-image:linear-gradient(rgba(10,14,22,.45),rgba(10,14,22,.45)),url('../img/login-bg.webp')}}
+:root[data-theme="dark"] .login{background-image:linear-gradient(rgba(10,14,22,.45),rgba(10,14,22,.45)),url('../img/login-bg.webp')}

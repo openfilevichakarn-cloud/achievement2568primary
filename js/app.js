@@ -15,7 +15,7 @@
 
   const S = {
     code: null, school: null, grade: 1, data: null, wb: null, styles: null, names: null,
-    view: { rowHidden: {}, bg: {}, locked: new Set(), logo: null },
+    view: { rowHidden: {}, colHidden, bg: {}, locked: new Set(), logo: null },
     userEdits: {}, version: 0, dirty: false, saving: false, active: null, editing: null, sel: null,
     dvCache: {}, zoom: 'fit', saveTimer: null, offline: false,
   };
@@ -53,9 +53,14 @@
     try {
       const res = await backend.login(code);
       if (!res || !res.ok) throw new Error((res && res.error) || 'รหัสสิทธิ์ไม่ถูกต้อง');
-      S.code = code; S.school = { name: res.school_name, grades: res.grades && res.grades.length ? res.grades : [1] };
+      const ready = (window.PP_CONFIG && PP_CONFIG.GRADES_READY) || [1];
+      const granted = res.grades && res.grades.length ? res.grades : [1];
+      const grades = granted.filter(g => ready.includes(g));
+      if (!grades.length) throw new Error('ชั้นที่โรงเรียนได้รับสิทธิ์ (ป.' + granted.join(', ป.') + ') ยังไม่เปิดให้ใช้งาน กรุณาติดต่อผู้ดูแล');
+      S.code = code; S.school = { name: res.school_name, grades };
       if (remember) LS.set('pp_code', code); else LS.del('pp_code');
-      await openGrade(S.school.grades.length === 1 ? S.school.grades[0] : (+LS.get('pp_grade') || S.school.grades[0]));
+      const last = +LS.get('pp_grade');
+      await openGrade(S.school.grades.includes(last) ? last : S.school.grades[0]);
     } catch (e) {
       $('#login-err').textContent = e.offline ? 'เชื่อมต่ออินเทอร์เน็ตไม่ได้ กรุณาลองใหม่' : (e.message || 'เข้าสู่ระบบไม่สำเร็จ');
       LS.del('pp_code');
@@ -73,7 +78,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ป.' + g + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261010c');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261015i');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -81,7 +86,7 @@
     $('#xl-css').textContent = R.styleCss(S.styles);
     S.wb = new P.Workbook(S.data);
     S.names = M.detectNames(S.wb);
-    S.view = { rowHidden: {}, bg: {}, locked: new Set(), logo: null };
+    S.view = { rowHidden: {}, colHidden, bg: {}, locked: new Set(), logo: null };
     S.userEdits = {}; S.dvCache = {};
     buildDvIndex();
     // โหลดข้อมูลที่บันทึกไว้
@@ -111,8 +116,50 @@
 
   function ctx() { return { wb: S.wb, view: S.view, names: S.names, toast }; }
 
+  // ข้อมูลที่บันทึกด้วยผังชีทคะแนนรายวิชาแบบเก่า -> ผังปัจจุบัน (ตัวชี้วัด 1-10 / เก็บ=รวมตัวชี้วัด / สอบ / รวม ต่อเทอม)
+  //  v1: A B เก็บ1 สอบ1 รวม1 เก็บ2 สอบ2 รวม2 ... หมายเหตุ(M)  -> คะแนนเก็บเดิมกลายเป็นตัวชี้วัด 1
+  //  v2: A B ตัวชี้วัด1 เก็บ1 สอบ1 รวม1 ตัวชี้วัด2 เก็บ2 สอบ2 ... หมายเหตุ(O) -> ตัวชี้วัด + เก็บเดิม เป็นตัวชี้วัด 1, 2
+  const SCORE_MAP = {
+    1: { C: 'C', D: 'N', F: 'P', G: 'AA', M: 'AG' },
+    2: { C: 'C', D: 'D', E: 'N', G: 'P', H: 'Q', I: 'AA', O: 'AG' },
+  };
+  const V2_MAX = { C4: 20, D4: 15, E4: 15, G4: 20, H4: 15, I4: 15 };   // คะแนนเต็มค่าเริ่มต้นของผัง v2
+  function migrateDoc(doc) {
+    const v = (doc && doc.v) || 1;
+    if (!doc || !doc.cells || v >= 3) return doc;
+    for (const [sheet, m] of Object.entries(doc.cells)) {
+      if (!/^คะแนนรายวิชา \d+$/.test(sheet)) continue;
+      const src = Object.keys(m).length && v === 2 ? { ...V2_MAX, ...m } : m;
+      const out = {};
+      for (const [ref, val] of Object.entries(src)) {
+        const a = /^([A-Z]+)(\d+)$/.exec(ref); if (!a) continue;
+        const col = P.colToNum(a[1]) <= 2 ? a[1] : SCORE_MAP[v][a[1]];
+        if (col) out[col + a[2]] = val;
+      }
+      doc.cells[sheet] = out;
+    }
+    doc.v = 3;
+    return doc;
+  }
+
+  // ชีทคะแนนรายวิชา: ซ่อนคอลัมน์ตัวชี้วัดที่ยังไม่ได้กำหนดคะแนนเต็ม (แถว 4)
+  function colHidden(sheetName, c) {
+    const sh = S.wb.sheet(sheetName); if (!sh) return undefined;
+    // คุณลักษณะ / กิจกรรม: ซ่อนหัวข้อที่ชื่อว่าง (แถว 3)
+    const fx = sh.def.flex;
+    if (fx && fx.items) {
+      if (c < fx.items[0] || c > fx.items[1]) return undefined;
+      const h = S.wb.get(sh, 3, c); return h === null || h === undefined || String(h).trim() === '';
+    }
+    const n = sh.def.indicator; if (!n) return undefined;
+    if (!((c >= 3 && c < 3 + n) || (c >= 16 && c < 16 + n))) return undefined;
+    const v = S.wb.get(sh, 4, c);
+    return v === null || v === undefined || v === '';
+  }
+
   function applyDoc(doc) {
     const wb = S.wb;
+    doc = migrateDoc(doc);
     if (doc && doc.cells) {
       for (const [sheet, m] of Object.entries(doc.cells)) {
         if (!wb.sheet(sheet)) continue;
@@ -199,16 +246,16 @@
   function closeDoc() { $('#docviewer').hidden = true; document.body.classList.remove('docopen'); if (window.PPUI) PPUI.refresh(); }
   function refreshDoc() { if (!$('#docviewer').hidden) renderSheet(); }
 
-  function sheetHtmlFor(name, edit, area) {
-    return R.sheetHtml({ wb: S.wb, sheetName: name, view: S.view, edit, area, styles: S.styles, hasList: (s, r, c) => { const d = findDv(s, r, c); return d && d.t === 'list'; }, logo: S.view.logo, logoAt: logoAnchor });
+  function sheetHtmlFor(name, edit, area, viewOv) {
+    return R.sheetHtml({ wb: S.wb, sheetName: name, view: viewOv ? { ...S.view, ...viewOv } : S.view, edit, area, styles: S.styles, hasList: (s, r, c) => { const d = findDv(s, r, c); return d && d.t === 'list'; }, logo: S.view.logo, logoAt: logoAnchor });
   }
   function renderSheet() {
     const pa = S.wb.sheet(S.active).def.print; const area = pa && pa.area ? pa.area.replace(/^.*!/, '') : null;
     const out = sheetHtmlFor(S.active, false, area);
     const host = $('#sheet-host'); host.innerHTML = out.html;
     const avail = Math.max(200, $('#sheet-scroll').clientWidth - 28);
-    const z = S.zoom === 'fit' ? Math.min(1, avail / Math.max(1, out.width)) : +S.zoom;
-    host.style.zoom = Math.max(0.2, z);
+    const z = S.zoom === 'fit' ? Math.min(1.6, avail / Math.max(1, out.width)) : +S.zoom;   // พอดีจอ: ขยายเกิน 100% ได้บนจอใหญ่
+    host.style.zoom = Math.max(0.2, z); host.style.setProperty('--bw', (1 / Math.max(0.2, z)) + 'px');
   }
 
   function logoAnchor(sheetName) {
@@ -222,15 +269,18 @@
     const tb = $('#sheet-tools'); tb.innerHTML = '';
     const add = (label, fn, cls) => { const b = document.createElement('button'); b.className = 'btn ' + (cls || ''); b.textContent = label; b.onclick = fn; tb.appendChild(b); };
     const n = S.active, N = S.names;
-    const isRep = n === N.sum || n === N.term[1] || n === N.term[2];
+    const isRep = n === N.sum || n === N.term[1] || n === N.term[2] || (N.stage && n === N.stage);
     if (isRep) {
       const sel = document.createElement('select'); sel.className = 'docsel'; sel.setAttribute('aria-label', 'เลือกนักเรียน');
       const cur = S.wb.get(S.wb.sheet(N.sum), 3, 2);
       sel.innerHTML = M.studentList(ctx()).map(x => `<option${x === cur ? ' selected' : ''}>${esc(x)}</option>`).join('');
       sel.onchange = () => { S.wb.setValue(N.sum, { r: 3, c: 2 }, sel.value); renderSheet(); };
       tb.appendChild(sel);
-      const which = n === N.sum ? 'sum' : (n === N.term[1] ? 1 : 2);
+      const which = n === N.sum ? 'sum' : n === N.stage ? 'stage' : (n === N.term[1] ? 1 : 2);
       add('พิมพ์คนนี้', () => printOne(which), 'primary'); add('พิมพ์ทั้งห้อง', () => printAll(which));
+    } else if (S.wb.sheet(n) && S.wb.sheet(n).def.indicator) {   // แบบบันทึกคะแนนรายวิชา: พิมพ์ทั้งหมด หรือแยกเทอม 1 / เทอม 2 / รวมทั้งปี
+      add('พิมพ์ทั้งหมด (3 หน้า)', () => printScores([n]), 'primary');
+      add('เทอม 1', () => printScores([n], 1)); add('เทอม 2', () => printScores([n], 2)); add('รวมทั้งปี', () => printScores([n], 'sum'));
     } else {
       add('พิมพ์', () => printSheets([n]), 'primary');
     }
@@ -245,7 +295,7 @@
     }
     const sp = document.createElement('span'); sp.className = 'grow'; tb.appendChild(sp);
     const z = document.createElement('label'); z.className = 'zoom';
-    z.innerHTML = 'ขนาด <select id="zoom"><option value="fit"' + (S.zoom === 'fit' ? ' selected' : '') + '>พอดีหน้าจอ</option>' + [0.6, 0.75, 1, 1.25].map(v => `<option value="${v}"${+S.zoom === v ? ' selected' : ''}>${Math.round(v * 100)}%</option>`).join('') + '</select>';
+    z.innerHTML = 'ขนาด <select id="zoom"><option value="fit"' + (S.zoom === 'fit' ? ' selected' : '') + '>พอดีหน้าจอ</option>' + [0.6, 0.75, 1, 1.25, 1.5].map(v => `<option value="${v}"${+S.zoom === v ? ' selected' : ''}>${Math.round(v * 100)}%</option>`).join('') + '</select>';
     tb.appendChild(z);
     $('#zoom').onchange = (e) => { S.zoom = e.target.value === 'fit' ? 'fit' : +e.target.value; renderSheet(); };
   }
@@ -292,7 +342,7 @@
   }
 
   // ---------------------------------------------------------------- save
-  function buildDoc() { return { v: 1, grade: S.grade, cells: S.userEdits, logo: S.view.logo || null, active: S.active, savedAt: new Date().toISOString() }; }
+  function buildDoc() { return { v: 3, grade: S.grade, cells: S.userEdits, logo: S.view.logo || null, active: S.active, savedAt: new Date().toISOString() }; }
   function markDirty() {
     if (S.batch) { S.pendingDirty = true; S.dirty = true; return; }
     S.dirty = true; setStatus('มีการแก้ไข... (จะบันทึกอัตโนมัติ)', 'dirty');
@@ -323,35 +373,113 @@
   }
   async function flushSave() { clearTimeout(S.saveTimer); if (S.dirty) await save(); }
 
+  // ---------------------------------------------------------------- สำรองข้อมูล (ไฟล์ .json ทุกชั้นที่โรงเรียนมีสิทธิ์)
+  const BACKUP_TAG = 'pp56-backup';
+  async function exportBackup() {
+    await flushSave();
+    const grades = {};
+    for (const g of S.school.grades) {
+      if (g === S.grade) { grades[g] = buildDoc(); continue; }
+      try { const res = await backend.load(S.code, g); if (res && res.data) grades[g] = res.data; }
+      catch (e) { toast('โหลดข้อมูล ป.' + g + ' ไม่ได้ — ' + (e.message || ''), 'warn'); return; }
+    }
+    const file = { app: BACKUP_TAG, ver: 1, school: S.school.name, exportedAt: new Date().toISOString(), grades };
+    const d = new Date(), pad = (x) => String(x).padStart(2, '0');
+    const name = `backup-pp5-pp6_${d.getFullYear() + 543}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.json`;   // ชื่อไฟล์ภาษาอังกฤษ: บางเบราว์เซอร์ไม่รองรับชื่อภาษาไทย
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(file)], { type: 'application/json' }));
+    a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast('ดาวน์โหลดไฟล์สำรองแล้ว (' + Object.keys(grades).map(g => 'ป.' + g).join(', ') + ')', 'ok');
+  }
+  function pickBackup() {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,application/json';
+    inp.onchange = () => { if (inp.files[0]) importBackup(inp.files[0]); };
+    inp.click();
+  }
+  async function importBackup(f) {
+    let file;
+    try { file = JSON.parse(await f.text()); } catch (e) { file = null; }
+    if (!file || file.app !== BACKUP_TAG || !file.grades || typeof file.grades !== 'object') { toast('ไฟล์นี้ไม่ใช่ไฟล์สำรองข้อมูลของโปรแกรม', 'warn'); return; }
+    const gs = Object.keys(file.grades).map(Number).filter(g => S.school.grades.includes(g) && file.grades[g] && file.grades[g].cells);
+    const skip = Object.keys(file.grades).map(Number).filter(g => !gs.includes(g));
+    if (!gs.length) { toast('ไฟล์สำรองไม่มีข้อมูลของชั้นที่โรงเรียนนี้ใช้งาน', 'warn'); return; }
+    const when = file.exportedAt ? new Date(file.exportedAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : '-';
+    const other = file.school && file.school !== S.school.name;
+    const yes = await modal('นำเข้าข้อมูลสำรอง', `<p>ไฟล์สำรองของ <b>${esc(file.school || '-')}</b> เมื่อ ${esc(when)}</p>
+      ${other ? '<p class="err">ชื่อโรงเรียนในไฟล์ไม่ตรงกับโรงเรียนที่เข้าสู่ระบบอยู่</p>' : ''}
+      <p>ข้อมูลปัจจุบันของ <b>${gs.map(g => 'ป.' + g).join(', ')}</b> จะถูก<b>แทนที่ทั้งหมด</b>ด้วยข้อมูลในไฟล์ (ย้อนกลับไม่ได้)</p>
+      ${skip.length ? `<p class="hint">ข้าม ${skip.map(g => 'ป.' + g).join(', ')} (โรงเรียนนี้ไม่มีสิทธิ์ชั้นนี้)</p>` : ''}
+      <p class="hint">แนะนำ: กด “สำรองข้อมูล” เก็บข้อมูลปัจจุบันไว้ก่อน</p>`,
+      [{ label: 'ยกเลิก', value: false }, { label: 'แทนที่ด้วยไฟล์สำรอง', value: true, primary: true }]);
+    if (!yes) return;
+    clearTimeout(S.saveTimer); S.dirty = false;
+    try {
+      for (const g of gs) {
+        const cur = await backend.load(S.code, g);
+        const doc = { ...file.grades[g], grade: g, savedAt: new Date().toISOString() };
+        const res = await backend.save(S.code, g, doc, (cur && cur.version) || 0, true);
+        if (!res || res.ok === false) throw new Error((res && res.error) || 'บันทึกไม่สำเร็จ');
+        if (g === S.grade) LS.del(draftKey());
+      }
+    } catch (e) { toast('นำเข้าไม่สำเร็จ: ' + (e.message || e), 'warn'); return; }
+    toast('นำเข้าข้อมูลสำรองแล้ว (' + gs.map(g => 'ป.' + g).join(', ') + ')', 'ok');
+    openGrade(gs.includes(S.grade) ? S.grade : gs[0]);
+  }
+
   // ---------------------------------------------------------------- print
   const PAPER = { 9: [210, 297], 8: [297, 420], 1: [216, 279], 5: [216, 356], 7: [184, 267] };
-  function printBlock(sheetName) {
+  function printBlock(sheetName, viewOv, fitBoth) {
     const d = S.wb.sheet(sheetName).def; const pr = d.print;
     const [pw, ph] = PAPER[pr.paper] || PAPER[9];
-    const land = pr.orient === 'landscape';
+    const land = false;   // พิมพ์แนวตั้งทุกหน้า
     const W = (land ? ph : pw) / 25.4 * 96, H = (land ? pw : ph) / 25.4 * 96;
     const m = pr.m || [0.7, 0.7, 0.75, 0.75];
     const availW = W - (m[0] + m[1]) * 96, availH = H - (m[2] + m[3]) * 96;
     let area = pr.area ? pr.area.replace(/^.*!/, '') : null;
-    const out = sheetHtmlFor(sheetName, false, area);
+    const out = sheetHtmlFor(sheetName, false, area, viewOv);
+    if (d.flex && d.flex.items) fitBoth = true;   // คุณลักษณะ / กิจกรรม: พอดี 1 หน้า
     let zoom = 1;
-    if (pr.fitPage) {
-      const fw = pr.fw === 0 ? 0 : (pr.fw || 1), fh = pr.fh === 0 ? 0 : (pr.fh || 1);
+    if (pr.fitPage || fitBoth) {
+      const fw = fitBoth ? 1 : pr.fw === 0 ? 0 : (pr.fw || 1), fh = fitBoth ? 1 : pr.fh === 0 ? 0 : (pr.fh || 1);
       const zw = fw ? availW * fw / out.width : Infinity, zh = fh ? availH * fh / out.height : Infinity;
       zoom = Math.min(1, zw, zh);
     } else if (pr.scale) zoom = pr.scale / 100;
     zoom = Math.max(0.2, zoom * 0.985);
-    return { html: out.html, zoom, land, m, hc: pr.hc, width: out.width * zoom };
+    // ปก ปพ.5: จัดกึ่งกลางหน้ากระดาษทั้งแนวนอนและแนวตั้ง
+    const cover = /^ปก /.test(sheetName);
+    return { html: out.html, zoom, land, m, hc: pr.hc || cover || !!(d.flex && d.flex.items), vc: cover, width: out.width * zoom };
+  }
+  // แบบบันทึกคะแนนรายวิชา: พิมพ์ 3 หน้า (เทอม 1 / เทอม 2 / สรุปทั้งปี) โดยซ่อนคอลัมน์ที่ไม่เกี่ยวในแต่ละหน้า
+  const SCORE_PAGES = [
+    { inds: 3, cols: [13, 14, 15, 30] },          // เทอม 1: ตัวชี้วัด C-L, เก็บ, สอบ, รวม, ระดับ ท.1
+    { inds: 16, cols: [26, 27, 28, 31] },         // เทอม 2: ตัวชี้วัด P-Y, เก็บ, สอบ, รวม, ระดับ ท.2
+    { inds: 0, cols: [13, 14, 26, 27, 29, 32] },  // ทั้งปี: เก็บ ท.1, สอบ ท.1, เก็บ ท.2, สอบ ท.2, รวมทั้งปี, ระดับทั้งปี
+  ];
+  // part: 1 = เทอม 1, 2 = เทอม 2, 'sum' = สรุปทั้งปี, ไม่ระบุ = ครบ 3 หน้า (ใช้กับชีทคะแนนรายวิชาเท่านั้น)
+  const SCORE_PART = { 1: 0, 2: 1, sum: 2 };
+  function blocksFor(sheetName, part) {
+    const sh = S.wb.sheet(sheetName); const n = sh && sh.def.indicator;
+    if (!n) return [printBlock(sheetName)];
+    const pages = part in SCORE_PART ? [SCORE_PAGES[SCORE_PART[part]]] : SCORE_PAGES;
+    return pages.map(pg => {
+      const show = new Set([1, 2, 33, ...pg.cols]);
+      if (pg.inds) for (let c = pg.inds; c < pg.inds + n; c++) { const v = S.wb.get(sh, 4, c); if (v !== null && v !== '') show.add(c); }
+      const blk = printBlock(sheetName, { colHidden: (name, c) => name === sheetName ? !show.has(c) : undefined }, true);   // 1 หน้าต่อส่วน
+      blk.hc = true; return blk;
+    });
   }
   async function printSheets(list, preBuilt) {
-    const blocks = preBuilt || list.filter(Boolean).map(printBlock);
+    const blocks = preBuilt || list.filter(Boolean).flatMap(blocksFor);
     const root = $('#print-root');
-    root.innerHTML = blocks.map(b => `<section class="pp-page ${b.land ? 'land' : 'port'}" style="padding:${b.m[2]}in ${b.m[1]}in ${b.m[3]}in ${b.m[0]}in"><div class="pp-zoom" style="zoom:${b.zoom}${b.hc ? ';margin:0 auto;width:max-content' : ''}">${b.html}</div></section>`).join('');
+    root.innerHTML = blocks.map(b => `<section class="pp-page ${b.land ? 'land' : 'port'}${b.vc ? ' vc' : ''}" style="padding:${b.m[2]}in ${b.m[1]}in ${b.m[3]}in ${b.m[0]}in"><div class="pp-zoom" style="zoom:${b.zoom};--bw:${1 / b.zoom}px${b.hc ? ';margin:0 auto;width:max-content' : ''}">${b.html}</div>${wmLayer(14)}</section>`).join('');
     document.body.classList.add('printing');
     await new Promise(r => setTimeout(r, 120));
     window.print();
     setTimeout(() => { document.body.classList.remove('printing'); root.innerHTML = ''; }, 500);
   }
+  // พิมพ์แบบบันทึกคะแนนรายวิชา (หลายวิชาได้) เฉพาะส่วนที่เลือก
+  function printScores(names, part) { printSheets(null, names.filter(n => S.wb.sheet(n)).flatMap(n => blocksFor(n, part))); }
   function printOne(which) { printSheets(M.sheetsFor(ctx(), which)); }
   async function printAll(which) {
     const students = M.studentList(ctx());
@@ -369,8 +497,37 @@
     refreshDoc();
   }
 
+  // พิมพ์หลายเอกสารรวดเดียว: items = [{ sheet, subj? }] (subj = วิชาที่ให้หน้าปก ปพ.5 รายวิชา แสดง)
+  const SUBJ_CELL = { r: 6, c: 18 };   // ปก ปพ.5 รายวิชา!R6
+  function setCoverSubject(sheet, subj) { S.wb.setValue(sheet, SUBJ_CELL, subj); }
+  async function printSet(items) {
+    items = items.filter(x => x && S.wb.sheet(x.sheet));
+    if (!items.length) { toast('ไม่มีเอกสารให้พิมพ์', 'warn'); return; }
+    const old = {}; const blocks = [];
+    for (const it of items) {
+      if (it.subj !== undefined) { if (!(it.sheet in old)) old[it.sheet] = S.wb.get(S.wb.sheet(it.sheet), SUBJ_CELL.r, SUBJ_CELL.c); setCoverSubject(it.sheet, it.subj); }
+      blocks.push(...blocksFor(it.sheet, it.part));
+    }
+    for (const [sh, v] of Object.entries(old)) setCoverSubject(sh, v);
+    await printSheets(null, blocks);
+  }
+  function openCover(sheet, subj) { if (subj !== undefined) applyValue(sheet, SUBJ_CELL.r, SUBJ_CELL.c, subj); openDoc(sheet); }
+
+  // ลายน้ำ (เว็บตัวอย่าง: PP_CONFIG.WATERMARK) — ทับทุกหน้าจอและทุกหน้าที่พิมพ์
+  function wmLayer(n) { return CFG.WATERMARK ? `<div class="wm-layer" aria-hidden="true">${`<span>${esc(CFG.WATERMARK)}</span>`.repeat(n)}</div>` : ''; }
+
   // ---------------------------------------------------------------- boot
   function boot() {
+    if (CFG.WATERMARK) document.body.insertAdjacentHTML('beforeend', wmLayer(80));
+    if (CFG.SAMPLE_DIR) {   // เว็บตัวอย่าง: ข้อความหน้าเข้าสู่ระบบ + ปุ่มคืนค่าข้อมูลตัวอย่าง
+      $('#demo-note').innerHTML = '<b>เว็บตัวอย่างสำหรับทดลองใช้</b> — มีข้อมูลนักเรียนสมมติ 40 คนทุกชั้น (ป.1–ป.6) แก้ไขได้อิสระ การแก้ไขเก็บในเบราว์เซอร์นี้เท่านั้น กด “เข้าสู่ระบบ” ได้ทันที (รหัส <code>DEMO</code>)';
+      $('#save-now').insertAdjacentHTML('beforebegin', '<button id="sample-reset" class="btn" title="ล้างการแก้ไขทั้งหมด กลับเป็นข้อมูลตัวอย่าง">คืนค่าตัวอย่าง</button>');
+      $('#sample-reset').onclick = async () => {
+        const yes = await modal('คืนค่าข้อมูลตัวอย่าง', '<p>ล้างการแก้ไขทั้งหมดในเบราว์เซอร์นี้ และกลับไปใช้ข้อมูลตัวอย่างเดิมทุกชั้น?</p>', [{ label: 'ยกเลิก', value: false }, { label: 'คืนค่า', value: true, primary: true }]);
+        if (!yes) return;
+        S.dirty = false; clearTimeout(S.saveTimer); backend.reset(); location.reload();
+      };
+    }
     $('#login-form').addEventListener('submit', (e) => { e.preventDefault(); doLogin($('#login-code').value, $('#login-remember').checked); });
     $('#logout').onclick = logout;
     $('#doc-close').onclick = closeDoc;
@@ -387,6 +544,6 @@
   document.addEventListener('DOMContentLoaded', boot);
   window.PPApp = {
     S, ctx, toast, modal, applyValue, validate, markDirty, save, batch, printSheets, printOne, printAll, printBlock,
-    openDoc, closeDoc, refreshDoc, pickLogo: () => $('#logo-file').click(), removeLogo, setStatus, flushSave,
+    openDoc, closeDoc, refreshDoc, printSet, printScores, exportBackup, pickBackup, openCover, pickLogo: () => $('#logo-file').click(), removeLogo, setStatus, flushSave,
   };
 })();

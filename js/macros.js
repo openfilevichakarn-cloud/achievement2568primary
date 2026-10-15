@@ -18,6 +18,8 @@
       sum, sumBeh: find(/^ป\.\d-\d+$/),
       p1: find(/^ข้อมูลป\.\d+$/),
       term: [null, term(1), term(2)], termBeh: [null, beh(1), beh(2)],
+      // ป.3 / ป.6: หน้าสรุปประถมศึกษาตอนต้น / ตอนปลาย และหน้าคำอธิบายพฤติกรรมของหน้านั้น
+      stage: find(/^ปพ\.6 ประถมตอน/), stageBeh: find(/^ป\.\d-\d+ ประถมตอน/),
     };
   }
 
@@ -30,13 +32,52 @@
   function hideReportRows(ctx) {
     const { wb, view, names } = ctx;
     const src = wb.sheet(names.sum);
-    const deputy = wb.get(wb.sheet(names.info), 7, 2);
-    const noDeputy = String(deputy === null ? '' : deputy).trim().length === 0;
+    const blank = (r) => { const v = wb.get(wb.sheet(names.info), r, 2); return String(v === null ? '' : v).trim().length === 0; };
+    const noAcad = blank(6), noDeputy = blank(7);   // ข้อมูลพื้นฐาน B6 หัวหน้างานวิชาการ, B7 รอง ผอ.
+    const rowMap = (nm) => { let m = view.rowHidden[nm]; if (!m) { m = new Map(); view.rowHidden[nm] = m; } return m; };
+    view.mergeOv = view.mergeOv || {};
     for (const nm of [names.sum, names.term[1], names.term[2]]) {
       if (!nm) continue;
-      let m = view.rowHidden[nm]; if (!m) { m = new Map(); view.rowHidden[nm] = m; }
+      const m = rowMap(nm);
       for (let r = 6; r <= 29; r++) { const v = wb.get(src, r, 5); m.set(r, String(v === null ? '' : v).trim().length === 0); }
       for (let r = 37; r <= 39; r++) m.set(r, noDeputy);
+      // ไม่มีหัวหน้างานวิชาการ: ลายเซ็นครูประจำชั้น (A33:A35) ขยายเต็มแถว อยู่กึ่งกลางตรงกับผู้อำนวยการ
+      const def = wb.sheet(nm).def;
+      if (noAcad) {
+        const keep = def.merges.filter(x => !/^[AC]3[345]:/.test(x));
+        view.mergeOv[nm] = keep.concat(['A33:G33', 'A34:G34', 'A35:G35']);
+      } else delete view.mergeOv[nm];
+    }
+    // หน้าสรุปประถมตอนต้น/ตอนปลาย: หาแถวลายเซ็นจากสูตร (ข้อมูลพื้นฐาน!B5 ครู / B6 วิชาการ / B7 รอง ผอ.)
+    if (names.stage) {
+      const sh = wb.sheet(names.stage), def = sh.def, m = rowMap(names.stage);
+      let rT = 0, rD = 0, last = 'H';
+      for (const cell of sh.cells.values()) {
+        const f = cell.f || '';
+        if (/ข้อมูลพื้นฐาน!B5/.test(f) && cell.c === 1) rT = cell.r;
+        if (/ข้อมูลพื้นฐาน!B7/.test(f) && cell.c === 1) rD = cell.r;
+      }
+      if (rD) for (let r = rD - 1; r <= rD + 1; r++) m.set(r, noDeputy);
+      if (rT && noAcad) {
+        const rows = [rT - 1, rT, rT + 1];
+        const keep = def.merges.filter(x => { const mm = /^[A-Z]+(\d+):[A-Z]+(\d+)$/.exec(x); return !(mm && rows.includes(+mm[1])); });
+        view.mergeOv[names.stage] = keep.concat(rows.map(r => `A${r}:${last}${r}`));
+      } else delete view.mergeOv[names.stage];
+    }
+    // ปก ปพ.5: ซ่อนแถวลายเซ็นรอง ผอ. / หัวหน้างานวิชาการ เมื่อไม่ได้ใส่ชื่อ
+    for (const sh of wb.sheets) {
+      if (!/^ปก ปพ\.5/.test(sh.name)) continue;
+      const m = rowMap(sh.name);
+      for (const cell of sh.cells.values()) {
+        if (typeof cell.v === 'string' && cell.v.endsWith('รองผู้อำนวยการโรงเรียน')) m.set(cell.r, noDeputy);
+        else if (typeof cell.v === 'string' && cell.v.endsWith('หัวหน้างานวิชาการโรงเรียน')) m.set(cell.r, noAcad);
+      }
+    }
+    // หน้าคำอธิบายพฤติกรรม: ซ่อนแถวของความสามารถที่ไม่ใช้ (ชื่อว่างใน ปพ.6 รวม!I6:I13)
+    for (const nm of [names.sumBeh, names.termBeh[1], names.termBeh[2]]) {
+      if (!nm) continue;
+      let m = view.rowHidden[nm]; if (!m) { m = new Map(); view.rowHidden[nm] = m; }
+      for (let i = 0; i < 8; i++) { const v = wb.get(src, 6 + i, 9); m.set(4 + i, String(v === null ? '' : v).trim().length === 0); }
     }
   }
 
@@ -89,7 +130,9 @@
   function onChange(ctx, sheetName, r, c) {
     const { wb, names, toast } = ctx;
     // ข้อมูลพื้นฐาน!B7 -> ซ่อน/แสดงลายเซ็นรอง ผอ.
-    if (sheetName === names.info && r === 7 && c === 2) hideReportRows(ctx);
+    if (sheetName === names.info && (r === 6 || r === 7) && c === 2) hideReportRows(ctx);
+    // ชื่อความสามารถ (ปพ.6 รวม!I6:I13) -> ซ่อน/แสดงแถวในหน้าคำอธิบายพฤติกรรม
+    if (sheetName === names.sum && c === 9 && r >= 6 && r <= 13) hideReportRows(ctx);
     // ข้อมูลวิชา คอลัมน์ A:C
     if (sheetName === names.subj && c >= 1 && c <= 3) {
       if (c === 3) {
@@ -122,6 +165,7 @@
   function sheetsFor(ctx, which) { // which: 'sum'|1|2
     const { names } = ctx;
     if (which === 'sum') return [names.sum, names.sumBeh];
+    if (which === 'stage') return [names.stage, names.stageBeh];
     return [names.term[which], names.termBeh[which]];
   }
 

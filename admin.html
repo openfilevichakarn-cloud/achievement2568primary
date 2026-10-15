@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#1f5eff">
+<title>ผู้ดูแลระบบ — โปรแกรมแจ้งผลการศึกษา ปพ.5 และ ปพ.6</title>
+<script src="js/theme.js?v=20261015i"></script>
+<link rel="stylesheet" href="css/app.css?v=20261015i">
+<link rel="stylesheet" href="css/ui.css?v=20261015i">
+<link rel="stylesheet" href="css/admin.css?v=20261015i">
+</head>
+<body class="admin">
+
+<main id="a-login" class="login">
+  <button class="btn theme-fab" type="button" data-theme-toggle aria-label="สลับโหมดมืด/สว่าง">🌙</button>
+  <form id="a-login-form" class="login-card" autocomplete="off">
+    <h1>ผู้ดูแลระบบ<br><small>ออกรหัส / รายชื่อโรงเรียน / รีเซ็ตรหัส</small></h1>
+    <label for="a-pass">รหัสผ่านผู้ดูแล</label>
+    <input id="a-pass" type="password" autocomplete="current-password" required>
+    <button class="btn primary wide" type="submit">เข้าสู่ระบบ</button>
+    <p id="a-err" class="err" role="alert"></p>
+    <p id="a-demo" class="demo" hidden><b>โหมดทดลอง</b> — ยังไม่ได้ตั้งค่า Supabase ข้อมูลเก็บในเบราว์เซอร์นี้ (รหัสผ่าน <code>DEMO-ADMIN</code>)</p>
+    <p class="fine">ตั้งรหัสผ่านผู้ดูแลครั้งแรกใน Supabase SQL Editor:<br><code>select public.set_admin_password('...');</code></p>
+  </form>
+</main>
+
+<div id="a-app" hidden>
+  <header class="topbar row sp">
+    <div class="brand">ผู้ดูแลระบบ</div>
+    <div class="row"><a class="btn" href="./">เปิดโปรแกรม</a><button class="btn theme-btn" type="button" data-theme-toggle aria-label="สลับโหมดมืด/สว่าง">🌙</button><button id="a-logout" class="btn">ออก</button></div>
+  </header>
+  <div class="a-wrap">
+    <section class="card">
+      <h3>ออกรหัสให้โรงเรียนใหม่</h3>
+      <div class="a-issue">
+        <label class="fld"><span>ชื่อโรงเรียน (1 บรรทัด = 1 โรงเรียน วางหลายโรงเรียนพร้อมกันได้)</span>
+          <textarea id="i-names" rows="4" placeholder="โรงเรียนบ้านตัวอย่าง&#10;โรงเรียนวัดตัวอย่าง"></textarea></label>
+        <div>
+          <div class="fld"><span>ชั้นที่ใช้ได้</span><div id="i-grades" class="gchk"></div></div>
+          <label class="fld"><span>หมายเหตุ (ไม่บังคับ เช่น ชำระแล้ว / ผู้ติดต่อ)</span><input id="i-note" type="text" class="in"></label>
+          <button id="i-go" class="btn primary" style="margin-top:10px">ออกรหัส</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="row sp" style="margin-bottom:8px">
+        <h3 style="margin:0">โรงเรียนทั้งหมด <span id="l-count" class="hint"></span></h3>
+        <div class="row">
+          <input id="l-q" class="in" type="search" placeholder="ค้นหาชื่อ / หมายเหตุ" style="width:16rem">
+          <div class="seg" id="l-filter"><button data-f="all" class="on">ทั้งหมด</button><button data-f="on">ใช้งาน</button><button data-f="off">ระงับ</button></div>
+          <button id="l-refresh" class="btn">รีเฟรช</button>
+        </div>
+      </div>
+      <div class="tw a-tw"><table class="t a-table"><thead><tr><th class="stk">โรงเรียน</th><th>ชั้น</th><th>สถานะ</th><th>บันทึกล่าสุด</th><th>หมายเหตุ</th><th>ออกรหัสเมื่อ</th><th style="min-width:250px">จัดการ</th></tr></thead><tbody id="l-body"></tbody></table></div>
+    </section>
+  </div>
+</div>
+
+<div id="modal" class="modal" hidden></div>
+<div id="toasts" class="toasts"></div>
+
+<script src="js/config.js?v=20261015i"></script>
+<script src="js/admin.js?v=20261015i"></script>
+</body>
+</html>
