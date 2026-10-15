@@ -63,3 +63,17 @@ for s in d['sheets']:
     c = s['cells'].get('A4')
     if c and isinstance(c.get('v'), str): c['v'] = re.sub(r'\s*\(ปรับได้ตามวิชา\)\s*', '', c['v']).strip()
 json.dump(d, open(path, 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
+
+# ชีทคะแนนรายวิชา: 'กำหนดคะแนนเต็ม' กึ่งกลาง และหัวคอลัมน์แยก 3 บรรทัด (ชื่อ / เทอม N / (เต็ม X))
+d = json.load(open(path, encoding='utf-8')); st = d['styles']; ctr = {}
+def center(i):
+    if i not in ctr:
+        s = copy.deepcopy(st[i]); s['a'][0] = 'center'; s['a'][1] = 'center'; st.append(s); ctr[i] = len(st) - 1
+    return ctr[i]
+for s in d['sheets']:
+    if not re.match(r'^คะแนนรายวิชา \d+$', s['name']): continue
+    s['cells']['A4']['s'] = center(s['cells']['A4']['s'])
+    for k, c in s['cells'].items():
+        if re.fullmatch(r'[A-Z]+5', k) and c.get('f') and re.search(r'"เทอม \d \(เต็ม "&', c['f']):
+            c['f'] = re.sub(r'"เทอม (\d) \(เต็ม "&', r'"เทอม \1"&CHAR(10)&"(เต็ม "&', c['f']); c.pop('c', None)
+json.dump(d, open(path, 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
