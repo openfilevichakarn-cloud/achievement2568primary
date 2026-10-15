@@ -182,6 +182,9 @@
       ${step(5, 'ประเมินคุณลักษณะและกิจกรรม', 'แตะช่องเพื่อเลือก ผ่าน / ไม่ผ่าน', p.ap >= 0.999, 'assess', p.ap)}
       ${step(6, 'ดูรายงานและพิมพ์ ปพ.6', 'ผลรายคน ภาพรวมห้อง และพิมพ์ทั้งห้อง', false, 'report')}
     </div>
+    <div class="card backup"><h3>สำรองข้อมูล</h3>
+      <p class="hint">ดาวน์โหลดข้อมูลทุกชั้นของโรงเรียนเก็บไว้เป็นไฟล์ (แนะนำทุกครั้งหลังกรอกคะแนนเสร็จ และก่อนส่งผลปลายภาค) และนำไฟล์กลับเข้ามาได้เมื่อต้องการกู้คืน</p>
+      <div class="row"><button class="btn primary" data-act="backup-out">⬇ สำรองข้อมูล (ดาวน์โหลดไฟล์)</button><button class="btn" data-act="backup-in">⬆ นำเข้าไฟล์สำรอง</button></div></div>
     <p class="hint" style="margin-top:14px">ระบบบันทึกอัตโนมัติขึ้นเซิร์ฟเวอร์ ใช้ได้ทั้งคอมพิวเตอร์และมือถือ ข้อมูลของโรงเรียนอื่นมองไม่เห็นกัน</p>`;
   }
 
@@ -780,6 +783,8 @@
       case 'open-doc': A().openDoc(b.dataset.n); break;
       case 'p5term': U.p5Term = b.dataset.k === 'sum' ? 'sum' : +b.dataset.k; refresh(); break;
       case 'print-doc': A().printSheets([b.dataset.n]); break;
+      case 'backup-out': A().exportBackup(); break;
+      case 'backup-in': A().pickBackup(); break;
       case 'print-score': A().printScores(b.dataset.n === '*' ? subjects().map(s => L.score(s.slot)) : [b.dataset.n], b.dataset.part); break;
       default: break;
     }

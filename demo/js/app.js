@@ -78,7 +78,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ป.' + g + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261015g');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261015h');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -373,6 +373,60 @@
   }
   async function flushSave() { clearTimeout(S.saveTimer); if (S.dirty) await save(); }
 
+  // ---------------------------------------------------------------- สำรองข้อมูล (ไฟล์ .json ทุกชั้นที่โรงเรียนมีสิทธิ์)
+  const BACKUP_TAG = 'pp56-backup';
+  async function exportBackup() {
+    await flushSave();
+    const grades = {};
+    for (const g of S.school.grades) {
+      if (g === S.grade) { grades[g] = buildDoc(); continue; }
+      try { const res = await backend.load(S.code, g); if (res && res.data) grades[g] = res.data; }
+      catch (e) { toast('โหลดข้อมูล ป.' + g + ' ไม่ได้ — ' + (e.message || ''), 'warn'); return; }
+    }
+    const file = { app: BACKUP_TAG, ver: 1, school: S.school.name, exportedAt: new Date().toISOString(), grades };
+    const d = new Date(), pad = (x) => String(x).padStart(2, '0');
+    const name = `backup-pp5-pp6_${d.getFullYear() + 543}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.json`;   // ชื่อไฟล์ภาษาอังกฤษ: บางเบราว์เซอร์ไม่รองรับชื่อภาษาไทย
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(file)], { type: 'application/json' }));
+    a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast('ดาวน์โหลดไฟล์สำรองแล้ว (' + Object.keys(grades).map(g => 'ป.' + g).join(', ') + ')', 'ok');
+  }
+  function pickBackup() {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,application/json';
+    inp.onchange = () => { if (inp.files[0]) importBackup(inp.files[0]); };
+    inp.click();
+  }
+  async function importBackup(f) {
+    let file;
+    try { file = JSON.parse(await f.text()); } catch (e) { file = null; }
+    if (!file || file.app !== BACKUP_TAG || !file.grades || typeof file.grades !== 'object') { toast('ไฟล์นี้ไม่ใช่ไฟล์สำรองข้อมูลของโปรแกรม', 'warn'); return; }
+    const gs = Object.keys(file.grades).map(Number).filter(g => S.school.grades.includes(g) && file.grades[g] && file.grades[g].cells);
+    const skip = Object.keys(file.grades).map(Number).filter(g => !gs.includes(g));
+    if (!gs.length) { toast('ไฟล์สำรองไม่มีข้อมูลของชั้นที่โรงเรียนนี้ใช้งาน', 'warn'); return; }
+    const when = file.exportedAt ? new Date(file.exportedAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : '-';
+    const other = file.school && file.school !== S.school.name;
+    const yes = await modal('นำเข้าข้อมูลสำรอง', `<p>ไฟล์สำรองของ <b>${esc(file.school || '-')}</b> เมื่อ ${esc(when)}</p>
+      ${other ? '<p class="err">ชื่อโรงเรียนในไฟล์ไม่ตรงกับโรงเรียนที่เข้าสู่ระบบอยู่</p>' : ''}
+      <p>ข้อมูลปัจจุบันของ <b>${gs.map(g => 'ป.' + g).join(', ')}</b> จะถูก<b>แทนที่ทั้งหมด</b>ด้วยข้อมูลในไฟล์ (ย้อนกลับไม่ได้)</p>
+      ${skip.length ? `<p class="hint">ข้าม ${skip.map(g => 'ป.' + g).join(', ')} (โรงเรียนนี้ไม่มีสิทธิ์ชั้นนี้)</p>` : ''}
+      <p class="hint">แนะนำ: กด “สำรองข้อมูล” เก็บข้อมูลปัจจุบันไว้ก่อน</p>`,
+      [{ label: 'ยกเลิก', value: false }, { label: 'แทนที่ด้วยไฟล์สำรอง', value: true, primary: true }]);
+    if (!yes) return;
+    clearTimeout(S.saveTimer); S.dirty = false;
+    try {
+      for (const g of gs) {
+        const cur = await backend.load(S.code, g);
+        const doc = { ...file.grades[g], grade: g, savedAt: new Date().toISOString() };
+        const res = await backend.save(S.code, g, doc, (cur && cur.version) || 0, true);
+        if (!res || res.ok === false) throw new Error((res && res.error) || 'บันทึกไม่สำเร็จ');
+        if (g === S.grade) LS.del(draftKey());
+      }
+    } catch (e) { toast('นำเข้าไม่สำเร็จ: ' + (e.message || e), 'warn'); return; }
+    toast('นำเข้าข้อมูลสำรองแล้ว (' + gs.map(g => 'ป.' + g).join(', ') + ')', 'ok');
+    openGrade(gs.includes(S.grade) ? S.grade : gs[0]);
+  }
+
   // ---------------------------------------------------------------- print
   const PAPER = { 9: [210, 297], 8: [297, 420], 1: [216, 279], 5: [216, 356], 7: [184, 267] };
   function printBlock(sheetName, viewOv, fitBoth) {
@@ -490,6 +544,6 @@
   document.addEventListener('DOMContentLoaded', boot);
   window.PPApp = {
     S, ctx, toast, modal, applyValue, validate, markDirty, save, batch, printSheets, printOne, printAll, printBlock,
-    openDoc, closeDoc, refreshDoc, printSet, printScores, openCover, pickLogo: () => $('#logo-file').click(), removeLogo, setStatus, flushSave,
+    openDoc, closeDoc, refreshDoc, printSet, printScores, exportBackup, pickBackup, openCover, pickLogo: () => $('#logo-file').click(), removeLogo, setStatus, flushSave,
   };
 })();
