@@ -662,34 +662,12 @@
   const whichKey = () => U.repTerm;
 
   // ---------------------------------------------------------------- เอกสาร
-  // ---------------------------------------------------------------- รายงาน ปพ.5 (หน้าปก รายชั้น/รายวิชา + แบบบันทึกคะแนน + คุณลักษณะ/กิจกรรม)
-  function p5Sheets(T) {
-    const all = WB().sheets.map(s => s.name), key = T === 'sum' ? 'รวม' : 'เทอม' + T;
-    return {
-      cls: all.find(n => n === 'ปก ปพ.5 รายชั้น ' + key),
-      subj: all.find(n => n === 'ปก ปพ.5 รายวิชา ' + key),
-      assess: (T === 'sum' ? [L.traitY, L.actY] : [L.trait(T), L.act(T)]).filter(Boolean),
-    };
-  }
+  // ---------------------------------------------------------------- รายงาน ปพ.5 (ตารางสรุปผล)
   function vReport5() {
-    const subs = subjects(), T = U.p5Term, P = p5Sheets(T);
+    const subs = subjects(), T = U.p5Term;
     if (!subs.length) return `<div class="card empty"><b>ยังไม่มีรายวิชา</b><br><button class="btn primary" data-act="goto" data-to="data:subjects">ไปเพิ่มวิชา</button></div>`;
-    const btns = (open, print) => `<span class="grow"></span><button class="btn sm" ${open}>ดู</button><button class="btn sm" ${print}>พิมพ์</button>`;
-    const row = (label, open, print) => `<div class="p5row"><span>${label}</span>${btns(open, print)}</div>`;
-    const da = (o) => Object.entries(o).map(([k, v]) => `data-${k}="${esc(v)}"`).join(' ');
-    const subRows = (kind) => subs.map((s, i) => kind === 'cover'
-      ? row(esc(oneLine(s.name)), da({ act: 'p5-open', n: P.subj, s: s.name }), da({ act: 'p5-print', set: kind, i }))
-      : row(esc(oneLine(s.name)), da({ act: 'open-doc', n: L.score(s.slot) }), da({ act: 'print-doc', n: L.score(s.slot) }))).join('');
-    return `<div class="bar">${seg([[1, 'เทอม 1'], [2, 'เทอม 2'], ['sum', 'ทั้งปี (รวม)']], T, 'p5term')}<span class="grow"></span><button class="btn primary" data-act="p5-print" data-set="all">🖨 พิมพ์ ปพ.5 ทั้งชุด</button></div>
-      ${p5Summary(T, subs)}
-      <h3 class="p5h">เอกสาร ปพ.5 สำหรับพิมพ์</h3>
-      <p class="sub">ทั้งชุด = ปกรายชั้น + ปกรายวิชาทุกวิชา + แบบบันทึกคะแนนทุกวิชา + คุณลักษณะ/กิจกรรม</p>
-      <div class="p5grid">
-      <div class="card"><h3>ปก ปพ.5 รายชั้น</h3>${row('ภาพรวมทั้งชั้น', da({ act: 'open-doc', n: P.cls }), da({ act: 'print-doc', n: P.cls }))}</div>
-      <div class="card"><h3>ปก ปพ.5 รายวิชา</h3><div class="row" style="margin-bottom:6px"><span class="hint">${subs.length} วิชา</span><span class="grow"></span><button class="btn sm" data-act="p5-print" data-set="cover">พิมพ์ทุกวิชา</button></div>${subRows('cover')}</div>
-      <div class="card"><h3>แบบบันทึกคะแนนรายวิชา</h3><div class="row" style="margin-bottom:6px"><span class="hint">ทั้งปี (เทอม 1 + เทอม 2) ในแผ่นเดียว</span><span class="grow"></span><button class="btn sm" data-act="p5-print" data-set="score">พิมพ์ทุกวิชา</button></div>${subRows('score')}</div>
-      <div class="card"><h3>คุณลักษณะ / กิจกรรมพัฒนาผู้เรียน</h3>${P.assess.map(n => row(esc(n), da({ act: 'open-doc', n }), da({ act: 'print-doc', n }))).join('')}</div>
-      </div>`;
+    return `<div class="bar">${seg([[1, 'เทอม 1'], [2, 'เทอม 2'], ['sum', 'ทั้งปี (รวม)']], T, 'p5term')}</div>
+      ${p5Summary(T, subs)}`;
   }
   // ตารางสรุป ปพ.5 ของเทอมที่เลือก (คำนวณจากชีทคะแนน/คุณลักษณะ/กิจกรรม)
   function p5Summary(T, subs) {
@@ -738,17 +716,6 @@
         <div class="tw p5tw"><table class="t p5t"><thead><tr><th style="text-align:left">รายการ</th><th>ผ่าน</th><th>ไม่ผ่าน</th><th>ยังไม่ประเมิน</th><th style="min-width:140px">สัดส่วน</th></tr></thead>
         <tbody>${asRow('trait', 'คุณลักษณะอันพึงประสงค์')}${asRow('act', 'กิจกรรมพัฒนาผู้เรียน')}</tbody></table></div></div>`;
   }
-  function p5Print(set, i) {
-    const subs = subjects(), P = p5Sheets(U.p5Term);
-    const covers = (list) => list.map(s => ({ sheet: P.subj, subj: s.name }));
-    const scores = subs.map(s => ({ sheet: L.score(s.slot) }));
-    let items;
-    if (set === 'cover') items = i !== undefined ? covers([subs[+i]]) : covers(subs);
-    else if (set === 'score') items = scores;
-    else items = [{ sheet: P.cls }, ...covers(subs), ...scores, ...P.assess.map(n => ({ sheet: n }))];
-    A().printSet(items);
-  }
-
   function vDocs() {
     const wb = WB(); const all = wb.sheets.filter(s => !s.def.hidden).map(s => s.name);
     const subs = subjects(); const used = new Set();
@@ -800,8 +767,6 @@
       case 'print-all': A().printAll(whichKey()); break;
       case 'open-doc': A().openDoc(b.dataset.n); break;
       case 'p5term': U.p5Term = b.dataset.k === 'sum' ? 'sum' : +b.dataset.k; refresh(); break;
-      case 'p5-open': A().openCover(b.dataset.n, b.dataset.s); break;
-      case 'p5-print': p5Print(b.dataset.set, b.dataset.i); break;
       case 'print-doc': A().printSheets([b.dataset.n]); break;
       default: break;
     }

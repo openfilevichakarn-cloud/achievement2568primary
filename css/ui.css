@@ -221,10 +221,6 @@ input.gc.no{background:#fee2e2;color:var(--err);font-weight:700}
 .pick select{min-width:0}.pick .btn{flex:none}
 
 /* รายงาน ปพ.5 */
-.p5grid{display:grid;grid-template-columns:1fr;gap:0 14px;align-items:start}
-@media (min-width:1100px){.p5grid{grid-template-columns:1fr 1fr}}
-.p5row{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)}
-.p5row:first-of-type{border-top:0}
 .tabbar button{line-height:1.15;text-align:center}
 
 /* ระดับที่คาดหวังของหน้าสรุปประถมตอนต้น/ตอนปลาย */
@@ -249,7 +245,6 @@ table.p5t .warnc{color:var(--warn);font-weight:600}
 .lvn.l1,.lvh.l1{color:var(--lv1)} .lvn.l1{background:var(--lv1bg)}
 .lvn.l2,.lvh.l2{color:var(--lv2)} .lvn.l2{background:var(--lv2bg)}
 .lvn.l3,.lvh.l3{color:var(--lv3)} .lvn.l3{background:var(--lv3bg)}
-.p5h{margin:18px 0 4px}
 
 /* แถบเมนู: สีประจำแต่ละเมนู (ไอคอนเป็นสีเสมอ เมนูที่เลือกมีพื้นสีอ่อน) */
 .tabbar .t-home{--tc:#2563eb} .tabbar .t-data{--tc:#0891b2} .tabbar .t-scores{--tc:#ea580c} .tabbar .t-assess{--tc:#16a34a}
