@@ -319,3 +319,14 @@ grant execute on function public.admin_update(text, uuid, text, smallint[], bool
 --  ออกรหัสใหม่ (รหัสเดิมใช้ไม่ได้):     select public.reset_school_code('...');
 --  ระงับสิทธิ์:                       update public.schools set active = false where id = '...';
 --  ดูว่าโรงเรียนไหนบันทึกล่าสุด:       select s.name, d.grade, d.version, d.updated_at from public.school_data d join public.schools s on s.id = d.school_id order by d.updated_at desc;
+
+-- ---------- กันโปรเจกต์ Supabase แบบฟรีหยุดอัตโนมัติ (เรียกจาก .github/workflows/keepalive.yml ทุก 3 วัน) ----------
+create or replace function public.ping() returns jsonb
+language plpgsql security definer
+set search_path = public
+as $$
+begin
+  perform 1 from public.schools limit 1;   -- แตะฐานข้อมูลจริง (ไม่เปิดเผยข้อมูลใด ๆ)
+  return jsonb_build_object('ok', true, 'at', now());
+end $$;
+grant execute on function public.ping() to anon, authenticated;
