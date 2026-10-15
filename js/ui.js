@@ -762,8 +762,7 @@
       grp('ปพ.6 แจ้งผลการเรียน', [L.sum, L.sumBeh, L.term[1], L.termBeh[1], L.term[2], L.termBeh[2], L.stage, L.stageBeh].filter(Boolean)) +
       grp('ปก ปพ.5', all.filter(n => /^ปก /.test(n))) +
       grp('แบบบันทึกคะแนนรายวิชา (ปพ.5)', scoreNames, (n) => { const s = subs.find(x => L.score(x.slot) === n); return s ? oneLine(s.name) : n; }) +
-      grp('คุณลักษณะและกิจกรรม', all.filter(n => /^(คุณลักษณะ|กิจกรรมพัฒนาผู้เรียน)/.test(n))) +
-      grp('คู่มือ', all.filter(n => n === 'คู่มือ'));
+      grp('คุณลักษณะและกิจกรรม', all.filter(n => /^(คุณลักษณะ|กิจกรรมพัฒนาผู้เรียน)/.test(n)));
   }
 
   // ---------------------------------------------------------------- เหตุการณ์

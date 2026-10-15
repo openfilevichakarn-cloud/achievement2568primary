@@ -6,13 +6,15 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#1f5eff">
 <title>ผู้ดูแลระบบ — โปรแกรมแจ้งผลการศึกษา ปพ.5 และ ปพ.6</title>
-<link rel="stylesheet" href="css/app.css?v=20261010y">
-<link rel="stylesheet" href="css/ui.css?v=20261010y">
-<link rel="stylesheet" href="css/admin.css?v=20261010y">
+<script src="js/theme.js?v=20261015c"></script>
+<link rel="stylesheet" href="css/app.css?v=20261015c">
+<link rel="stylesheet" href="css/ui.css?v=20261015c">
+<link rel="stylesheet" href="css/admin.css?v=20261015c">
 </head>
 <body class="admin">
 
 <main id="a-login" class="login">
+  <button class="btn theme-fab" type="button" data-theme-toggle aria-label="สลับโหมดมืด/สว่าง">🌙</button>
   <form id="a-login-form" class="login-card" autocomplete="off">
     <h1>ผู้ดูแลระบบ<br><small>ออกรหัส / รายชื่อโรงเรียน / รีเซ็ตรหัส</small></h1>
     <label for="a-pass">รหัสผ่านผู้ดูแล</label>
@@ -27,7 +29,7 @@
 <div id="a-app" hidden>
   <header class="topbar row sp">
     <div class="brand">ผู้ดูแลระบบ</div>
-    <div class="row"><a class="btn" href="./">เปิดโปรแกรม</a><button id="a-logout" class="btn">ออก</button></div>
+    <div class="row"><a class="btn" href="./">เปิดโปรแกรม</a><button class="btn theme-btn" type="button" data-theme-toggle aria-label="สลับโหมดมืด/สว่าง">🌙</button><button id="a-logout" class="btn">ออก</button></div>
   </header>
   <div class="a-wrap">
     <section class="card">
@@ -60,7 +62,7 @@
 <div id="modal" class="modal" hidden></div>
 <div id="toasts" class="toasts"></div>
 
-<script src="js/config.js?v=20261010y"></script>
-<script src="js/admin.js?v=20261010y"></script>
+<script src="js/config.js?v=20261015c"></script>
+<script src="js/admin.js?v=20261015c"></script>
 </body>
 </html>
