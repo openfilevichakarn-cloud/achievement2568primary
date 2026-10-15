@@ -78,7 +78,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ป.' + g + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261015f');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261015g');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -278,6 +278,9 @@
       tb.appendChild(sel);
       const which = n === N.sum ? 'sum' : n === N.stage ? 'stage' : (n === N.term[1] ? 1 : 2);
       add('พิมพ์คนนี้', () => printOne(which), 'primary'); add('พิมพ์ทั้งห้อง', () => printAll(which));
+    } else if (S.wb.sheet(n) && S.wb.sheet(n).def.indicator) {   // แบบบันทึกคะแนนรายวิชา: พิมพ์ทั้งหมด หรือแยกเทอม 1 / เทอม 2 / รวมทั้งปี
+      add('พิมพ์ทั้งหมด (3 หน้า)', () => printScores([n]), 'primary');
+      add('เทอม 1', () => printScores([n], 1)); add('เทอม 2', () => printScores([n], 2)); add('รวมทั้งปี', () => printScores([n], 'sum'));
     } else {
       add('พิมพ์', () => printSheets([n]), 'primary');
     }
@@ -399,10 +402,13 @@
     { inds: 16, cols: [26, 27, 28, 31] },         // เทอม 2: ตัวชี้วัด P-Y, เก็บ, สอบ, รวม, ระดับ ท.2
     { inds: 0, cols: [13, 14, 26, 27, 29, 32] },  // ทั้งปี: เก็บ ท.1, สอบ ท.1, เก็บ ท.2, สอบ ท.2, รวมทั้งปี, ระดับทั้งปี
   ];
-  function blocksFor(sheetName) {
+  // part: 1 = เทอม 1, 2 = เทอม 2, 'sum' = สรุปทั้งปี, ไม่ระบุ = ครบ 3 หน้า (ใช้กับชีทคะแนนรายวิชาเท่านั้น)
+  const SCORE_PART = { 1: 0, 2: 1, sum: 2 };
+  function blocksFor(sheetName, part) {
     const sh = S.wb.sheet(sheetName); const n = sh && sh.def.indicator;
     if (!n) return [printBlock(sheetName)];
-    return SCORE_PAGES.map(pg => {
+    const pages = part in SCORE_PART ? [SCORE_PAGES[SCORE_PART[part]]] : SCORE_PAGES;
+    return pages.map(pg => {
       const show = new Set([1, 2, 33, ...pg.cols]);
       if (pg.inds) for (let c = pg.inds; c < pg.inds + n; c++) { const v = S.wb.get(sh, 4, c); if (v !== null && v !== '') show.add(c); }
       const blk = printBlock(sheetName, { colHidden: (name, c) => name === sheetName ? !show.has(c) : undefined }, true);   // 1 หน้าต่อส่วน
@@ -418,6 +424,8 @@
     window.print();
     setTimeout(() => { document.body.classList.remove('printing'); root.innerHTML = ''; }, 500);
   }
+  // พิมพ์แบบบันทึกคะแนนรายวิชา (หลายวิชาได้) เฉพาะส่วนที่เลือก
+  function printScores(names, part) { printSheets(null, names.filter(n => S.wb.sheet(n)).flatMap(n => blocksFor(n, part))); }
   function printOne(which) { printSheets(M.sheetsFor(ctx(), which)); }
   async function printAll(which) {
     const students = M.studentList(ctx());
@@ -444,7 +452,7 @@
     const old = {}; const blocks = [];
     for (const it of items) {
       if (it.subj !== undefined) { if (!(it.sheet in old)) old[it.sheet] = S.wb.get(S.wb.sheet(it.sheet), SUBJ_CELL.r, SUBJ_CELL.c); setCoverSubject(it.sheet, it.subj); }
-      blocks.push(...blocksFor(it.sheet));
+      blocks.push(...blocksFor(it.sheet, it.part));
     }
     for (const [sh, v] of Object.entries(old)) setCoverSubject(sh, v);
     await printSheets(null, blocks);
@@ -482,6 +490,6 @@
   document.addEventListener('DOMContentLoaded', boot);
   window.PPApp = {
     S, ctx, toast, modal, applyValue, validate, markDirty, save, batch, printSheets, printOne, printAll, printBlock,
-    openDoc, closeDoc, refreshDoc, printSet, openCover, pickLogo: () => $('#logo-file').click(), removeLogo, setStatus, flushSave,
+    openDoc, closeDoc, refreshDoc, printSet, printScores, openCover, pickLogo: () => $('#logo-file').click(), removeLogo, setStatus, flushSave,
   };
 })();

@@ -69,8 +69,8 @@
       if (!/^ปก ปพ\.5/.test(sh.name)) continue;
       const m = rowMap(sh.name);
       for (const cell of sh.cells.values()) {
-        if (cell.v === 'รองผู้อำนวยการโรงเรียน') m.set(cell.r, noDeputy);
-        else if (cell.v === 'หัวหน้างานวิชาการโรงเรียน') m.set(cell.r, noAcad);
+        if (typeof cell.v === 'string' && cell.v.endsWith('รองผู้อำนวยการโรงเรียน')) m.set(cell.r, noDeputy);
+        else if (typeof cell.v === 'string' && cell.v.endsWith('หัวหน้างานวิชาการโรงเรียน')) m.set(cell.r, noAcad);
       }
     }
     // หน้าคำอธิบายพฤติกรรม: ซ่อนแถวของความสามารถที่ไม่ใช้ (ชื่อว่างใน ปพ.6 รวม!I6:I13)

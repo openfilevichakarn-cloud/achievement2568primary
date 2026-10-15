@@ -728,8 +728,20 @@
     return `<h2>เอกสารรูปแบบทางการ</h2><p class="sub">ดูตัวอย่างและพิมพ์แบบฟอร์ม ปพ.5 / ปพ.6 ตามต้นฉบับ (แก้ข้อมูลที่หน้าอื่น เอกสารจะอัปเดตเอง)</p>` +
       grp('ปพ.6 แจ้งผลการเรียน', [L.sum, L.sumBeh, L.term[1], L.termBeh[1], L.term[2], L.termBeh[2], L.stage, L.stageBeh].filter(Boolean)) +
       grp('ปก ปพ.5', all.filter(n => /^ปก /.test(n))) +
-      grp('แบบบันทึกคะแนนรายวิชา (ปพ.5)', scoreNames, (n) => { const s = subs.find(x => L.score(x.slot) === n); return s ? oneLine(s.name) : n; }) +
+      scoreGrp(scoreNames.filter(n => all.includes(n) && !used.has(n)), subs) +
       grp('คุณลักษณะและกิจกรรม', all.filter(n => /^(คุณลักษณะ|กิจกรรมพัฒนาผู้เรียน)/.test(n)));
+  }
+
+  // แบบบันทึกคะแนนรายวิชา: พิมพ์ทั้งหมด หรือแยก เทอม 1 / เทอม 2 / รวมทั้งปี (รายวิชา หรือทุกวิชา)
+  function scoreGrp(names, subs) {
+    if (!names.length) return '';
+    const parts = (n) => `<button class="btn" data-act="print-score" data-n="${esc(n)}">พิมพ์</button>` +
+      [['1', 'ท.1'], ['2', 'ท.2'], ['sum', 'รวม']].map(([k, t]) => `<button class="btn sm" data-act="print-score" data-n="${esc(n)}" data-part="${k}" title="พิมพ์เฉพาะ${k === 'sum' ? 'สรุปทั้งปี' : 'เทอม ' + k}">${t}</button>`).join('');
+    const label = (n) => { const s = subs.find(x => L.score(x.slot) === n); return s ? oneLine(s.name) : n; };
+    return `<div class="card"><h3>แบบบันทึกคะแนนรายวิชา (ปพ.5)</h3>
+      <div class="row" style="margin-bottom:8px"><span class="hint">พิมพ์ทุกวิชา:</span>
+        <button class="btn sm primary" data-act="print-score" data-n="*">ทั้งหมด</button><button class="btn sm" data-act="print-score" data-n="*" data-part="1">เทอม 1</button><button class="btn sm" data-act="print-score" data-n="*" data-part="2">เทอม 2</button><button class="btn sm" data-act="print-score" data-n="*" data-part="sum">รวมทั้งปี</button></div>
+      <div class="dlist">${names.map(n => `<div class="ditem"><button class="open" data-act="open-doc" data-n="${esc(n)}">${esc(label(n))}</button>${parts(n)}</div>`).join('')}</div></div>`;
   }
 
   // ---------------------------------------------------------------- เหตุการณ์
@@ -768,6 +780,7 @@
       case 'open-doc': A().openDoc(b.dataset.n); break;
       case 'p5term': U.p5Term = b.dataset.k === 'sum' ? 'sum' : +b.dataset.k; refresh(); break;
       case 'print-doc': A().printSheets([b.dataset.n]); break;
+      case 'print-score': A().printScores(b.dataset.n === '*' ? subjects().map(s => L.score(s.slot)) : [b.dataset.n], b.dataset.part); break;
       default: break;
     }
   }
