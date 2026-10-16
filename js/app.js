@@ -86,7 +86,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ' + roomLabel(g, room) + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261016z');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261017a');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -183,8 +183,12 @@
     M.update1Full(ctx());
   }
 
-  // ชื่อชั้นในเอกสาร (รายวิชา!C2 ใช้ในสูตรของเอกสารทุกฉบับ): ล็อกตามชั้น/ห้องที่เปิดอยู่ เช่น ป.1/1 = ประถมศึกษาปีที่ 1/1 (แก้เองไม่ได้)
-  function classText() { return 'ประถมศึกษาปีที่ ' + S.grade + '/' + S.room; }
+  // ชื่อชั้นในเอกสาร (รายวิชา!C2 ใช้ในสูตรของเอกสารทุกฉบับ): ล็อกตามชั้น/ห้องที่เปิดอยู่ (แก้เองไม่ได้)
+  // ชั้นที่มีหลายห้อง: ประถมศึกษาปีที่ 1/2 · ชั้นที่มีห้องเดียว: ประถมศึกษาปีที่ 1
+  function classText() {
+    const multi = S.room > 1 || (S.rooms[S.grade] || []).length > 1;
+    return 'ประถมศึกษาปีที่ ' + S.grade + (multi ? '/' + S.room : '');
+  }
   function roomClassLabel() {
     if (!S.wb.sheet('รายวิชา')) return;
     S.wb.setValue('รายวิชา', 'C2', classText());
@@ -254,6 +258,7 @@
         LS.del('pp_draft_' + P_hash(S.code) + '_' + g + (r > 1 ? '_' + r : ''));
         toast('ลบห้อง ' + roomLabel(g, r) + ' แล้ว', 'ok');
         if (g === S.grade && r === S.room) { S.dirty = false; clearTimeout(S.saveTimer); close(); openGrade(g, S.rooms[g][0]); return; }
+        if (g === S.grade) { roomClassLabel(); if (window.PPUI) PPUI.refresh(); }   // เหลือห้องเดียว: ชื่อชั้นตัด /ห้อง ออก
         buildGradeSwitch(); draw();
       }
     };
