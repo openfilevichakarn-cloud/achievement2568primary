@@ -607,6 +607,20 @@ begin
   return jsonb_build_object('ok', true, 'status', 'review', 'reason', coalesce(p_reason, 'รอผู้ดูแลตรวจสอบ'));
 end $$;
 
+-- สำรอง: ถ้าเว็บติดต่อ Edge Function ตรวจสลิปไม่ได้ (ยังไม่ติดตั้ง / ขัดข้อง) รับคำสั่งซื้อ + สลิปไว้ให้ผู้ดูแลตรวจเอง (ไม่ออกรหัสอัตโนมัติ)
+create or replace function public.order_submit_manual(p jsonb) returns jsonb
+language plpgsql security definer set search_path = public, extensions as $$
+declare r jsonb;
+begin
+  if coalesce(p->>'website', '') <> '' then return jsonb_build_object('ok', true, 'status', 'review', 'ref', 'OK'); end if;   -- กับดักบอท
+  r := public.order_start(p, public._client_ip());
+  if not coalesce((r->>'ok')::boolean, false) then return r; end if;
+  update public.orders set status = 'review', reason = 'ระบบตรวจสลิปอัตโนมัติไม่พร้อมใช้งาน — รอผู้ดูแลตรวจสลิป' where id = (r->>'id')::uuid;
+  return jsonb_build_object('ok', true, 'status', 'review', 'ref', r->>'ref', 'amount', r->'amount', 'reason', 'ระบบตรวจสลิปอัตโนมัติไม่พร้อมใช้งานชั่วคราว');
+end $$;
+revoke all on function public.order_submit_manual(jsonb) from public, anon, authenticated;
+grant execute on function public.order_submit_manual(jsonb) to anon, authenticated;
+
 -- ---------- ผู้ดูแล ----------
 create or replace function public.admin_orders(p_pass text) returns jsonb
 language plpgsql security definer set search_path = public, extensions as $$

@@ -78,14 +78,23 @@
       try { const k = 'pp_demo_orders', x = JSON.parse(localStorage.getItem(k) || '[]'); x.push({ ...order, id: crypto.randomUUID(), ref: h.slice(0, 6), status: 'approved', has_slip: !!order.slip_image, created_at: new Date().toISOString() }); localStorage.setItem(k, JSON.stringify(x)); } catch (e) { /* ignore */ }
       return { ok: true, status: 'approved', code: 'DEMO-' + h.slice(0, 4) + '-' + h.slice(4, 8) + '-' + h.slice(8, 12), school: order.school, grades: order.grades, ref: h.slice(0, 6), demo: true };
     }
-    let r;
-    try { r = await fetch(`${base}/functions/v1/auto-register`, { method: 'POST', headers: H, body: JSON.stringify({ order }) }); }
-    catch (e) { throw new Error('เชื่อมต่ออินเทอร์เน็ตไม่ได้ กรุณาลองใหม่'); }
-    const j = await r.json().catch(() => null);
-    if (r.status === 404) throw new Error('ระบบสั่งซื้ออัตโนมัติยังไม่เปิด กรุณาติดต่อทางเพจ');
-    if (!j) throw new Error('ส่งไม่สำเร็จ (' + r.status + ')');
-    if (j.ok === false) throw new Error(j.error || 'ส่งไม่สำเร็จ');
-    return j;
+    // 1) ตรวจสลิปอัตโนมัติผ่าน Edge Function
+    let r = null, j = null;
+    try {
+      r = await fetch(`${base}/functions/v1/auto-register`, { method: 'POST', headers: H, body: JSON.stringify({ order }) });
+      j = await r.json().catch(() => null);
+    } catch (e) { console.warn('auto-register unreachable', e); }
+    if (j && j.ok === false && r.status < 500) throw new Error(j.error || 'ส่งไม่สำเร็จ');   // ข้อมูลไม่ถูกต้อง เช่น ไม่กรอกชื่อ / ราคาเปลี่ยน
+    if (r && r.ok && j && j.ok) return j;
+    // 2) ติดต่อระบบตรวจสลิปไม่ได้ (ยังไม่ติดตั้ง / ขัดข้อง): ส่งคำสั่งซื้อ + สลิปให้ผู้ดูแลตรวจเอง
+    console.warn('auto-register failed', r && r.status, j);
+    let m;
+    try { m = await fetch(`${base}/rest/v1/rpc/order_submit_manual`, { method: 'POST', headers: H, body: JSON.stringify({ p: order }) }); }
+    catch (e) { throw new Error('เชื่อมต่ออินเทอร์เน็ตไม่ได้ กรุณาตรวจสอบสัญญาณแล้วลองใหม่'); }
+    const mj = await m.json().catch(() => null);
+    if (!m.ok || !mj) throw new Error('ระบบรับคำสั่งซื้อขัดข้องชั่วคราว (' + (r ? 'ตรวจสลิป ' + r.status : 'ติดต่อระบบตรวจสลิปไม่ได้') + ') กรุณาติดต่อทางเพจ — ไม่ต้องโอนเงินซ้ำ');
+    if (mj.ok === false) throw new Error(mj.error || 'ส่งไม่สำเร็จ');
+    return mj;
   }
 
   function done(res, order) {
