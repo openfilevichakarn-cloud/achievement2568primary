@@ -6,10 +6,10 @@
 <meta name="theme-color" content="#1f5eff">
 <meta name="description" content="โปรแกรมแจ้งผลการศึกษา ปพ.5 และ ปพ.6 หลักสูตร 2568 ระดับประถมศึกษา ใช้งานผ่านเว็บ ทดลองใช้ฟรีก่อนสั่งซื้อ">
 <title>สมัครใช้งาน — โปรแกรมแจ้งผลการศึกษา ปพ.5 และ ปพ.6</title>
-<script src="js/theme.js?v=20261016e"></script>
-<link rel="stylesheet" href="css/app.css?v=20261016e">
-<link rel="stylesheet" href="css/ui.css?v=20261016e">
-<link rel="stylesheet" href="css/register.css?v=20261016e">
+<script src="js/theme.js?v=20261016f"></script>
+<link rel="stylesheet" href="css/app.css?v=20261016f">
+<link rel="stylesheet" href="css/ui.css?v=20261016f">
+<link rel="stylesheet" href="css/register.css?v=20261016f">
 </head>
 <body class="reg">
 
@@ -31,7 +31,7 @@
       <h1>ทำ ปพ.5 และ ปพ.6 เสร็จในเว็บเดียว<br><small>กรอกคะแนนครั้งเดียว เอกสารออกครบทุกฉบับ</small></h1>
       <p class="rg-lead">ใช้งานผ่านเว็บเบราว์เซอร์ ไม่ต้องติดตั้งโปรแกรม ไม่ต้องเปิดไฟล์ Excel มาโคร ใช้ได้ทั้งคอมพิวเตอร์ แท็บเล็ต และมือถือ ข้อมูลบันทึกอัตโนมัติ</p>
       <div class="rg-cta">
-        <a class="btn primary big" href="#register">สมัครใช้งาน / ขอใบเสนอราคา</a>
+        <a class="btn primary big" href="#register">สั่งซื้อ / รับรหัสทันที</a>
         <a class="btn big" id="demo-link" href="demo/" target="_blank" rel="noopener">ทดลองใช้เว็บตัวอย่าง ↗</a>
       </div>
       <ul class="rg-points"><li>✓ ทดลองใช้ฟรี มีข้อมูลตัวอย่าง 40 คน</li><li>✓ ชั้นละไม่เกิน 10 ห้อง</li><li>✓ ใช้รหัสเดียวทั้งโรงเรียน</li></ul>
@@ -57,9 +57,9 @@
     <h2>ขั้นตอนการสั่งซื้อ</h2>
     <ol class="rg-steps">
       <li><b>ทดลองใช้</b><span>เปิดเว็บตัวอย่าง ลองกรอก ลองพิมพ์ได้ทุกเมนู</span></li>
-      <li><b>ส่งแบบฟอร์มสมัคร</b><span>กรอกข้อมูลโรงเรียนและชั้นที่ต้องการด้านล่าง</span></li>
-      <li><b>ชำระเงิน</b><span>เจ้าหน้าที่ติดต่อกลับพร้อมรายละเอียดการชำระเงิน</span></li>
-      <li><b>รับรหัสสิทธิ์</b><span>ได้รหัสโรงเรียน เข้าใช้งานได้ทันที</span></li>
+      <li><b>เลือกชั้นและโอนเงิน</b><span>ระบบคำนวณยอดให้ โอนเข้าบัญชีธนาคารกรุงไทยของร้าน</span></li>
+      <li><b>อัปโหลดสลิป</b><span>กรอกข้อมูลโรงเรียน เวลาโอน และแนบรูปสลิป</span></li>
+      <li><b>รับรหัสสิทธิ์ทันที</b><span>ระบบตรวจสลิปอัตโนมัติ ผ่านแล้วได้รหัสเข้าใช้งานทันที</span></li>
     </ol>
   </section>
 
@@ -71,31 +71,51 @@
 
   <!-- ===== register ===== -->
   <section class="rg-sec alt" id="register">
-    <h2>แบบฟอร์มสมัครใช้งาน</h2>
-    <p class="rg-sub">กรอกข้อมูลแล้วกดส่ง เจ้าหน้าที่จะติดต่อกลับเพื่อยืนยันและแจ้งการชำระเงิน</p>
-    <form id="reg-form" class="card rg-form" autocomplete="on" novalidate>
-      <div class="grid2">
-        <label class="fld full"><span>ชื่อโรงเรียน <b class="req">*</b></span><input name="school" required maxlength="200" placeholder="เช่น โรงเรียนบ้านตัวอย่าง"></label>
-        <label class="fld full"><span>สังกัด / อำเภอ / จังหวัด</span><input name="area" maxlength="200" placeholder="เช่น สพป.ตัวอย่าง เขต 1 · อ.เมือง จ.ตัวอย่าง"></label>
-        <label class="fld"><span>ชื่อ-สกุล ผู้ติดต่อ <b class="req">*</b></span><input name="contact" required maxlength="100" autocomplete="name"></label>
-        <label class="fld"><span>ตำแหน่ง</span><input name="position" maxlength="100" placeholder="เช่น ครูวิชาการ"></label>
-        <label class="fld"><span>เบอร์โทรศัพท์ <b class="req">*</b></span><input name="phone" required maxlength="30" inputmode="tel" autocomplete="tel"></label>
-        <label class="fld"><span>LINE ID</span><input name="line_id" maxlength="60"></label>
-        <label class="fld full"><span>อีเมล</span><input name="email" type="email" maxlength="120" autocomplete="email"></label>
-        <div class="fld full"><span>ชั้นที่ต้องการใช้งาน <b class="req">*</b></span>
-          <div class="rg-grades">
-            <label class="chk"><input type="checkbox" name="grades" value="1"> ป.1</label><label class="chk"><input type="checkbox" name="grades" value="2"> ป.2</label>
-            <label class="chk"><input type="checkbox" name="grades" value="3"> ป.3</label><label class="chk"><input type="checkbox" name="grades" value="4"> ป.4</label>
-            <label class="chk"><input type="checkbox" name="grades" value="5"> ป.5</label><label class="chk"><input type="checkbox" name="grades" value="6"> ป.6</label>
-            <button type="button" class="btn sm" id="all-grades">เลือกทุกชั้น</button>
-          </div></div>
-        <label class="fld"><span>จำนวนห้องเรียนรวมโดยประมาณ</span><input name="rooms" inputmode="numeric" maxlength="2" placeholder="เช่น 6"></label>
-        <label class="fld full"><span>ข้อความเพิ่มเติม</span><textarea name="note" rows="3" maxlength="1000" placeholder="เช่น ต้องการใบเสนอราคา / ใบเสร็จในนามโรงเรียน"></textarea></label>
-        <label class="rg-hp" aria-hidden="true">เว็บไซต์ <input name="website" tabindex="-1" autocomplete="off"></label>
+    <h2>สั่งซื้อและรับรหัสสิทธิ์อัตโนมัติ</h2>
+    <p class="rg-sub">เลือกชั้น → โอนเงิน → แนบสลิป ระบบตรวจสลิปและออกรหัสสิทธิ์ให้ทันที (ถ้าตรวจอัตโนมัติไม่ผ่าน เจ้าหน้าที่จะตรวจและติดต่อกลับ)</p>
+    <div id="order-closed" class="card rg-ask" hidden></div>
+    <form id="order-form" class="rg-order" autocomplete="on" novalidate>
+      <div class="card rg-stepcard">
+        <h3><span class="rg-n">1</span> เลือกชั้นที่ต้องการใช้งาน</h3>
+        <div class="rg-grades">
+          <label class="chk"><input type="checkbox" name="grades" value="1"> ป.1</label><label class="chk"><input type="checkbox" name="grades" value="2"> ป.2</label>
+          <label class="chk"><input type="checkbox" name="grades" value="3"> ป.3</label><label class="chk"><input type="checkbox" name="grades" value="4"> ป.4</label>
+          <label class="chk"><input type="checkbox" name="grades" value="5"> ป.5</label><label class="chk"><input type="checkbox" name="grades" value="6"> ป.6</label>
+          <button type="button" class="btn sm" id="all-grades">เลือกทุกชั้น</button>
+        </div>
+        <p class="hint" id="price-note"></p>
+        <div class="rg-total">ยอดที่ต้องโอน <b id="amount">–</b> บาท</div>
       </div>
-      <label class="chk rg-consent"><input type="checkbox" id="consent"> <span>ยินยอมให้ใช้ข้อมูลข้างต้นเพื่อการติดต่อเรื่องการสั่งซื้อและการใช้งานโปรแกรมเท่านั้น ตาม<a href="#pdpa" id="pdpa-link">ข้อกำหนดการคุ้มครองข้อมูลส่วนบุคคล (PDPA)</a></span></label>
-      <p id="reg-err" class="err" role="alert"></p>
-      <button class="btn primary big wide" type="submit" id="reg-go">ส่งแบบฟอร์มสมัครใช้งาน</button>
+      <div class="card rg-stepcard">
+        <h3><span class="rg-n">2</span> โอนเงินเข้าบัญชี</h3>
+        <div class="rg-bankbox">
+          <div><span class="hint">ธนาคาร</span><b id="bk-bank">ธนาคารกรุงไทย</b></div>
+          <div><span class="hint">เลขที่บัญชี</span><b id="bk-no" class="rg-accno">960-0-44146-4</b> <button type="button" class="btn sm" id="copy-acc">คัดลอก</button></div>
+          <div><span class="hint">ชื่อบัญชี</span><b id="bk-name">นายเบญจรงค์ นุ่มวัฒนะ</b></div>
+          <div><span class="hint">ยอดโอน</span><b class="rg-amt2"><span id="amount2">–</span> บาท</b></div>
+        </div>
+        <p class="hint">โอนให้ <b>ตรงยอด</b> (รวมเศษสตางค์ถ้ามี) และเก็บสลิปไว้ — สลิปต้องมี QR code ให้ตรวจได้ (สลิปจากแอปธนาคารทุกธนาคารมี QR)</p>
+      </div>
+      <div class="card rg-stepcard">
+        <h3><span class="rg-n">3</span> ข้อมูลโรงเรียนและสลิป</h3>
+        <div class="grid2">
+          <label class="fld full"><span>ชื่อโรงเรียน (จะแสดงบนเอกสารทุกฉบับ และแก้เองไม่ได้) <b class="req">*</b></span><input name="school" required maxlength="200" placeholder="เช่น โรงเรียนบ้านตัวอย่าง"></label>
+          <label class="fld full"><span>สังกัด / อำเภอ / จังหวัด</span><input name="area" maxlength="200"></label>
+          <label class="fld"><span>ชื่อ-สกุล ผู้ติดต่อ <b class="req">*</b></span><input name="contact" required maxlength="100" autocomplete="name"></label>
+          <label class="fld"><span>ตำแหน่ง</span><input name="position" maxlength="100"></label>
+          <label class="fld"><span>เบอร์โทรศัพท์ <b class="req">*</b></span><input name="phone" required maxlength="30" inputmode="tel" autocomplete="tel"></label>
+          <label class="fld"><span>LINE ID</span><input name="line_id" maxlength="60"></label>
+          <label class="fld full"><span>อีเมล</span><input name="email" type="email" maxlength="120" autocomplete="email"></label>
+          <label class="fld"><span>วันและเวลาที่โอน (ตามสลิป) <b class="req">*</b></span><input name="transfer_at" type="datetime-local" required></label>
+          <div class="fld"><span>รูปสลิปการโอนเงิน <b class="req">*</b></span>
+            <label class="rg-slip"><input type="file" id="slip" accept="image/*"><span id="slip-label">📎 เลือกรูปสลิป</span></label></div>
+          <div class="fld full"><img id="slip-preview" class="rg-slipimg" alt="ตัวอย่างสลิป" hidden></div>
+          <label class="rg-hp" aria-hidden="true">เว็บไซต์ <input name="website" tabindex="-1" autocomplete="off"></label>
+        </div>
+        <label class="chk rg-consent"><input type="checkbox" id="consent"> <span>ยอมรับ<a href="#pdpa" id="pdpa-link">ข้อกำหนดการคุ้มครองข้อมูลส่วนบุคคล (PDPA)</a> และยินยอมให้ส่งรูปสลิปไปยังบริการตรวจสลิปเพื่อยืนยันการชำระเงิน</span></label>
+        <p id="reg-err" class="err" role="alert"></p>
+        <button class="btn primary big wide" type="submit" id="reg-go">ส่งสลิปและรับรหัสสิทธิ์</button>
+      </div>
     </form>
     <div id="reg-done" class="card rg-done" hidden></div>
   </section>
@@ -114,8 +134,8 @@
           <p>ผู้ให้บริการโปรแกรมให้ความสำคัญกับการคุ้มครองข้อมูลส่วนบุคคลตามพระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 โดยมีข้อกำหนดดังนี้</p>
           <ol>
             <li><b>บทบาทของแต่ละฝ่าย</b> — โรงเรียนเป็น <b>ผู้ควบคุมข้อมูลส่วนบุคคล</b> ของนักเรียนและบุคลากรที่กรอกลงในโปรแกรม ผู้ให้บริการเป็น <b>ผู้ประมวลผลข้อมูลส่วนบุคคล</b> ที่จัดเก็บและประมวลผลตามการใช้งานของโรงเรียนเท่านั้น</li>
-            <li><b>ข้อมูลที่จัดเก็บ</b> — (ก) ข้อมูลในโปรแกรม: ชื่อ-สกุล เพศ ร้อยละการเข้าเรียน คะแนน และผลการประเมินของนักเรียน ชื่อครูและผู้บริหาร ตราโรงเรียน (ข) ข้อมูลการสมัครใช้งาน: ชื่อโรงเรียน ชื่อ ตำแหน่ง เบอร์โทรศัพท์ LINE และอีเมลของผู้ติดต่อ — ไม่จัดเก็บเลขประจำตัวประชาชน ที่อยู่ หรือข้อมูลอ่อนไหวของนักเรียน</li>
-            <li><b>วัตถุประสงค์</b> — ใช้เพื่อจัดทำเอกสารแจ้งผลการเรียน ปพ.5 / ปพ.6 ของโรงเรียน และใช้ข้อมูลผู้ติดต่อเพื่อการสั่งซื้อ ออกรหัสสิทธิ์ และให้ความช่วยเหลือการใช้งานเท่านั้น <b>ไม่ขาย ไม่เปิดเผย และไม่นำไปใช้เพื่อการตลาดหรือวัตถุประสงค์อื่น</b></li>
+            <li><b>ข้อมูลที่จัดเก็บ</b> — (ก) ข้อมูลในโปรแกรม: ชื่อ-สกุล เพศ ร้อยละการเข้าเรียน คะแนน และผลการประเมินของนักเรียน ชื่อครูและผู้บริหาร ตราโรงเรียน (ข) ข้อมูลการสั่งซื้อ: ชื่อโรงเรียน ชื่อ ตำแหน่ง เบอร์โทรศัพท์ LINE และอีเมลของผู้ติดต่อ รวมทั้งรูปสลิปและข้อมูลการโอนเงิน (ยอดเงิน เวลา ชื่อ/บัญชีผู้โอนตามที่ปรากฏในสลิป) — ไม่จัดเก็บเลขประจำตัวประชาชน ที่อยู่ หรือข้อมูลอ่อนไหวของนักเรียน</li>
+            <li><b>วัตถุประสงค์</b> — ใช้เพื่อจัดทำเอกสารแจ้งผลการเรียน ปพ.5 / ปพ.6 ของโรงเรียน และใช้ข้อมูลผู้ติดต่อและสลิปเพื่อยืนยันการชำระเงิน ออกรหัสสิทธิ์ และให้ความช่วยเหลือการใช้งานเท่านั้น (รูปสลิปถูกส่งไปยังผู้ให้บริการตรวจสลิป EasySlip เพื่อตรวจกับข้อมูลธนาคาร) <b>ไม่ขาย ไม่เปิดเผย และไม่นำไปใช้เพื่อการตลาดหรือวัตถุประสงค์อื่น</b></li>
             <li><b>การจัดเก็บและความปลอดภัย</b> — ข้อมูลเก็บบนฐานข้อมูลคลาวด์ (Supabase) รับส่งผ่านการเชื่อมต่อที่เข้ารหัส (HTTPS) ข้อมูลของแต่ละโรงเรียนแยกกัน เข้าถึงได้ด้วยรหัสสิทธิ์ของโรงเรียนนั้นเท่านั้น และรหัสสิทธิ์จัดเก็บแบบเข้ารหัสทางเดียว (hash)</li>
             <li><b>ผู้ที่เข้าถึงข้อมูลได้</b> — ผู้ที่ได้รับรหัสสิทธิ์จากโรงเรียน (โรงเรียนควรเก็บรหัสเป็นความลับ และขอรีเซ็ตรหัสได้ทันทีเมื่อสงสัยว่ารหัสรั่วไหล) และผู้ดูแลระบบเฉพาะกรณีจำเป็นเพื่อแก้ไขปัญหาหรือกู้คืนข้อมูลตามคำขอของโรงเรียน</li>
             <li><b>ระยะเวลาการจัดเก็บ</b> — เก็บไว้ตลอดระยะเวลาที่โรงเรียนใช้บริการ เมื่อสิ้นสุดการใช้บริการหรือโรงเรียนร้องขอ ผู้ให้บริการจะลบข้อมูลของโรงเรียนออกจากระบบ (แนะนำให้กด “สำรองข้อมูล” เก็บไว้ก่อน) ข้อมูลการสมัครที่ไม่ได้สั่งซื้อจะถูกลบเมื่อไม่มีความจำเป็นต้องใช้</li>
@@ -135,7 +155,7 @@
 </footer>
 
 <div id="toasts" class="toasts" aria-live="polite"></div>
-<script src="js/config.js?v=20261016e"></script>
-<script src="js/register.js?v=20261016e"></script>
+<script src="js/config.js?v=20261016f"></script>
+<script src="js/register.js?v=20261016f"></script>
 </body>
 </html>
