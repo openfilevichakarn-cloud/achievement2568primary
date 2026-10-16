@@ -296,3 +296,4 @@ details.man>summary .no{display:inline-grid;place-items:center;width:28px;height
 .rm-chip button{border:0;background:none;font:inherit;color:var(--ink);cursor:pointer;padding:5px 10px}
 .rm-chip .rm-del{color:var(--err);padding:5px 9px 5px 4px;font-weight:700}
 .rm-chip .rm-open:hover{color:var(--brand)}
+.modal-card label.chk{display:flex;gap:.5rem;align-items:center;margin:.35rem 0;cursor:pointer}

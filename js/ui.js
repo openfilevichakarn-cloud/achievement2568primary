@@ -396,7 +396,7 @@
     const maxBox = `<div class="card soft"><div class="hint" style="margin-bottom:6px">คะแนนเต็มรายตัวชี้วัด (คะแนนเก็บ = ผลรวมคะแนนตัวชี้วัด)</div>
       <div class="maxbox">${inds.map((c, i) => `<div class="indset"><b>ตัวชี้วัด ${i + 1}</b>${field('ชื่อ', inputFor(sc, IND_NAME_ROW, c, { after: 'rerender', ph: 'ตัวชี้วัด ' + (i + 1) }), 'wname')}${field('คะแนนเต็ม', mf(c))}</div>`).join('')}
       <div class="row indbtn"><button class="btn sm" data-act="ind-add"${inds.length >= NIND ? ' disabled' : ''}>＋ เพิ่มตัวชี้วัด</button><button class="btn sm" data-act="ind-del"${inds.length <= 1 ? ' disabled' : ''}>－ ลดตัวชี้วัด</button></div></div>
-      <div class="maxbox" style="margin-top:10px"><span class="hint">คะแนนเก็บ เต็ม <b>${num(sc, 4, SC[T].keep) ?? 0}</b></span>${field('คะแนนสอบ เต็ม', mf(SC[T].exam))}<span class="hint">รวมเต็ม <b>${mxs(SC[T].tot)}</b></span></div></div>`;
+      <div class="maxbox" style="margin-top:10px"><span class="hint">คะแนนเก็บ เต็ม <b>${num(sc, 4, SC[T].keep) ?? 0}</b></span>${field('คะแนนสอบ เต็ม', mf(SC[T].exam))}<span class="hint">รวมเต็ม <b>${mxs(SC[T].tot)}</b></span>${subs.length > 1 ? `<button class="btn sm" data-act="max-all" title="คัดลอกจำนวนตัวชี้วัดและคะแนนเต็มของวิชานี้ไปใช้กับวิชาอื่นทุกวิชา">⇉ ใช้คะแนนเต็มนี้กับทุกวิชา</button>` : ''}</div></div>`;
     // คอลัมน์ที่กรอกได้ (เรียงตามตาราง): ตัวชี้วัด..., สอบ, หมายเหตุ
     const head = `<tr><th class="no">ที่</th><th class="stk">ชื่อ - สกุล</th>${inds.map((c, i) => `<th title="${esc(indLabel(sc, c, i))}">${esc(indLabel(sc, c, i))}<br><small>(${mxs(c)})</small></th>`).join('')}
       <th class="ro">เก็บ<br><small>(${mxs(SC[T].keep)})</small></th><th>สอบ<br><small>(${mxs(SC[T].exam)})</small></th><th class="ro">รวม<br><small>(${mxs(SC[T].tot)})</small></th><th class="ro">ระดับ</th><th class="wide">หมายเหตุ</th></tr>`;
@@ -505,6 +505,42 @@
     const sc = L.score(curSubject().slot), T = U.scoreTerm;
     const c = SC[T].ind.find(x => !activeInds(sc, T).includes(x)); if (!c) return;
     setv(sc, 4, c, 10); refresh();
+  }
+  // คัดลอกโครงคะแนนเต็ม (จำนวนตัวชี้วัด + คะแนนเต็มแต่ละตัว + คะแนนสอบ) ของวิชานี้ไปวิชาอื่นทุกวิชา
+  // เช่น โรงเรียนเก็บเทอมละ 100: ตั้งวิชาเดียวแล้วกดปุ่มนี้ (ชื่อตัวชี้วัด / คะแนนที่กรอกแล้วไม่เปลี่ยน)
+  async function maxAll() {
+    const cur = curSubject(), sc = L.score(cur.slot), T = U.scoreTerm, inds = activeInds(sc, T);
+    const mx = inds.map(c => num(sc, 4, c) ?? 0), ex = num(sc, 4, SC[T].exam) ?? 0;
+    const others = subjects().filter(x => x.slot !== cur.slot);
+    const which = await uiModal({ title: 'ใช้คะแนนเต็มนี้กับทุกวิชา', ok: 'ตั้งค่าทุกวิชา',
+      body: `<p>คัดลอกคะแนนเต็มของ <b>${esc(oneLine(cur.name))}</b> เทอม ${T}:<br>ตัวชี้วัด ${inds.length} ตัว (${mx.join(' + ')}) + สอบ ${ex} = <b>รวม ${mx.reduce((a, b) => a + b, 0) + ex}</b></p>
+        <p>ไปใช้กับอีก <b>${others.length} วิชา</b></p>
+        <label class="chk"><input type="radio" name="mx-t" value="this" checked> เฉพาะเทอม ${T}</label>
+        <label class="chk"><input type="radio" name="mx-t" value="both"> ทั้งเทอม 1 และเทอม 2</label>
+        <p class="hint">ชื่อตัวชี้วัดและคะแนนที่กรอกไว้แล้วไม่เปลี่ยน — ตัวชี้วัดที่เกินจำนวนนี้และมีคะแนนกรอกไว้แล้วจะไม่ถูกลบ</p>`,
+      read: (m) => $('input[name=mx-t]:checked', m).value });
+    if (!which) return;
+    const terms = which === 'both' ? [1, 2] : [T];
+    let kept = 0;
+    A().batch(() => {
+      for (const o of others) for (const t of terms) {
+        const osc = L.score(o.slot);
+        SC[t].ind.forEach((c, i) => {
+          if (i < mx.length) { setv(osc, 4, c, mx[i]); return; }
+          if (get(osc, 4, c) === null) return;
+          const used = students().some(st => get(osc, stuScoreRow(st.r), c) !== null);
+          if (used) kept++; else setv(osc, 4, c, null);
+        });
+        setv(osc, 4, SC[t].exam, ex);
+      }
+      if (which === 'both') {   // วิชานี้เอง: อีกเทอมให้เหมือนกันด้วย
+        const t2 = T === 1 ? 2 : 1;
+        SC[t2].ind.forEach((c, i) => { if (i < mx.length) setv(sc, 4, c, mx[i]); else if (get(sc, 4, c) !== null && !students().some(st => get(sc, stuScoreRow(st.r), c) !== null)) setv(sc, 4, c, null); });
+        setv(sc, 4, SC[t2].exam, ex);
+      }
+    });
+    A().toast(`ตั้งคะแนนเต็มให้ ${others.length} วิชาแล้ว${kept ? ` · คงตัวชี้วัดที่มีคะแนนแล้วไว้ ${kept} ช่อง` : ''}`, kept ? 'warn' : 'ok');
+    refresh();
   }
   async function indDel() {
     const sc = L.score(curSubject().slot), T = U.scoreTerm, inds = activeInds(sc, T);
@@ -881,6 +917,7 @@
       <p>เมนู <b>คะแนน</b> — เลือกวิชาจากช่องด้านบน (หรือกด ‹ › เปลี่ยนวิชา) และเลือก <b>เทอม 1 / เทอม 2</b></p>
       <ul><li><b>ตั้งคะแนนเต็มก่อน:</b> กำหนดคะแนนเต็มของแต่ละตัวชี้วัดและคะแนนสอบ — กด <b>＋ เพิ่มตัวชี้วัด</b> / <b>－ ลดตัวชี้วัด</b> (สูงสุด 10 ตัวต่อเทอม) และตั้งชื่อตัวชี้วัดได้</li>
 <li><b>แบบฟอร์ม Excel:</b> กดปุ่ม <b>⬇ แบบฟอร์ม Excel</b> ได้ไฟล์ที่คอลัมน์ตรงกับตารางในหน้านี้ (มีรายชื่อนักเรียนให้แล้ว) กรอกเฉพาะช่องสีขาว แล้วคัดลอกช่องสีขาวทั้งหมดมาวางที่ช่องแรกของตาราง</li>
+      <li><b>เก็บคะแนนเทอมละ 50 หรือ 100 ก็ได้</b> — ตั้งคะแนนเต็มตามที่โรงเรียนใช้ ระดับคิดจากร้อยละเสมอ · ตั้งวิชาแรกเสร็จแล้วกด <b>⇉ ใช้คะแนนเต็มนี้กับทุกวิชา</b> ไม่ต้องตั้งทีละวิชา</li>
       <li><b>คะแนนเก็บ = ผลรวมคะแนนตัวชี้วัด</b> คำนวณให้อัตโนมัติ ไม่ต้องกรอก</li>
       <li>กรอกคะแนนรายตัวชี้วัดและคะแนนสอบ หรือวางจาก Excel ทีละหลายช่อง (<kbd>Ctrl</kbd>+<kbd>V</kbd>) — กรอกเกินคะแนนเต็มระบบจะไม่รับ</li>
       <li>ระดับผลการเรียนคำนวณอัตโนมัติจากร้อยละ: <b>75</b> ขึ้นไป = เชี่ยวชาญ · <b>65</b> = ชำนาญ · <b>55</b> = พัฒนา · ต่ำกว่า = เริ่มต้น</li>
@@ -956,6 +993,7 @@
       case 'as-add': asAdd(); break;
       case 'as-del': asDel(); break;
       case 'ind-del': indDel(); break;
+      case 'max-all': maxAll(); break;
       case 'sterm': U.scoreTerm = b.dataset.k === 'y' ? 'y' : +b.dataset.k; refresh(); break;
       case 'subj-step': { const subs = subjects(); const i = subs.findIndex(s => s.r === curSubject().r) + (+b.dataset.d); if (subs[i]) { U.slot = subs[i].r; refresh(); } break; }
       case 'akind': U.kind = b.dataset.k; refresh(); break;
