@@ -17,7 +17,7 @@
     const out = [];
     styles.forEach((s, i) => {
       const f = s.f, a = s.a; let css = '';
-      css += `font-family:${FONT_STACK};font-size:${(f[1] || 11) * 4 / 3}px;color:${f[5]};`;
+      css += `font-family:${FONT_STACK};font-size:calc(${(f[1] || 11) * 4 / 3}px * var(--fs,1));color:${f[5]};`;
       if (f[2]) css += 'font-weight:700;'; if (f[3]) css += 'font-style:italic;';
       if (f[4] && f[4] !== 'none') css += 'text-decoration:underline;';
       if (s.bg) css += `background:${s.bg};`;

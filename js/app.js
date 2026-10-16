@@ -86,7 +86,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ' + roomLabel(g, room) + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261016m');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261016n');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -533,7 +533,7 @@
     zoom = Math.max(0.2, zoom * 0.985);
     // ปก ปพ.5: จัดกึ่งกลางหน้ากระดาษทั้งแนวนอนและแนวตั้ง
     const cover = /^ปก /.test(sheetName);
-    return { html: out.html, zoom, land, m, hc: pr.hc || cover || !!(d.flex && d.flex.items), vc: cover, width: out.width * zoom };
+    return { html: out.html, zoom, fit: !!(pr.fitPage || fitBoth), land, m, hc: pr.hc || cover || !!(d.flex && d.flex.items), vc: cover, width: out.width * zoom };
   }
   // แบบบันทึกคะแนนรายวิชา: พิมพ์ 3 หน้า (เทอม 1 / เทอม 2 / สรุปทั้งปี) โดยซ่อนคอลัมน์ที่ไม่เกี่ยวในแต่ละหน้า
   const SCORE_PAGES = [
@@ -554,14 +554,69 @@
       blk.hc = true; return blk;
     });
   }
+  // ขนาดตัวอักษรตอนพิมพ์ (เท่าของขนาดในแบบฟอร์ม) — จำไว้ในเครื่องนี้
+  const FS_KEY = 'pp.printFs', FS_MIN = 0.8, FS_MAX = 1.8;
+  function getFs() { try { const v = +localStorage.getItem(FS_KEY); return v >= FS_MIN && v <= FS_MAX ? v : 1; } catch (e) { return 1; } }
+  function setFs(v) { try { localStorage.setItem(FS_KEY, String(v)); } catch (e) { /* ไม่มี storage ก็ใช้ได้ */ } }
+  // ใช้ขนาดตัวอักษร fs แล้วจัดแต่ละหน้าใหม่: ตัวอักษรใหญ่ขึ้นแถวจะสูงขึ้น หน้าที่ล้นกระดาษจะถูกย่อลงพอดีหน้า
+  function fitPages(root, blocks, fs) {
+    root.style.setProperty('--fs', fs);
+    let first = null; const firstIdx = blocks.findIndex(b => !b.custom);
+    root.querySelectorAll('.pp-page').forEach((sec, i) => {
+      const b = blocks[i], z = sec.firstElementChild;
+      const setZ = (v) => { z.style.zoom = v; z.style.setProperty('--bw', (1 / v) + 'px'); };
+      setZ(b.zoom);
+      if (i === firstIdx) first = b.zoom;
+      if (!b.fit) return;   // หน้าที่ไม่ได้ตั้ง "พอดี 1 หน้า" คงขนาดตามแบบฟอร์ม
+      const cs = getComputedStyle(sec), availH = sec.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      const availW = sec.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const r = z.getBoundingClientRect(); let k = 1;
+      if (r.height > availH + 1) k = Math.min(k, availH / r.height);
+      if (r.width > availW + 1) k = Math.min(k, availW / r.width);
+      const zz = k < 1 ? b.zoom * k * 0.995 : b.zoom;
+      if (k < 1) { setZ(zz); if (i === firstIdx) first = zz; }
+    });
+    return first;
+  }
+  // ตัวอย่างก่อนพิมพ์: ปรับขนาดตัวอักษรได้ แล้วกดพิมพ์
   async function printSheets(list, preBuilt) {
     const blocks = preBuilt || list.filter(Boolean).flatMap(blocksFor);
+    if (!blocks.length) return;
     const root = $('#print-root');
     root.innerHTML = blocks.map(b => `<section class="pp-page ${b.land ? 'land' : 'port'}${b.vc ? ' vc' : ''}" style="padding:${b.m[2]}in ${b.m[1]}in ${b.m[3]}in ${b.m[0]}in"><div class="pp-zoom" style="zoom:${b.zoom};--bw:${1 / b.zoom}px${b.hc ? ';margin:0 auto;width:max-content' : ''}">${b.html}</div>${wmLayer(14)}</section>`).join('');
-    document.body.classList.add('printing');
-    await new Promise(r => setTimeout(r, 120));
-    window.print();
-    setTimeout(() => { document.body.classList.remove('printing'); root.innerHTML = ''; }, 500);
+    let bar = $('#pv-bar');
+    if (!bar) {
+      document.body.insertAdjacentHTML('beforeend', `<div id="pv-bar" class="pv-bar" role="toolbar" aria-label="ตัวอย่างก่อนพิมพ์">
+        <b>ตัวอย่างก่อนพิมพ์</b><span class="hint" id="pv-n"></span>
+        <span class="pv-fs">ขนาดตัวอักษร <button class="btn sm" data-fs="-1" title="เล็กลง">A−</button><output id="pv-fsv"></output><button class="btn sm" data-fs="1" title="ใหญ่ขึ้น">A+</button><button class="btn sm ghost" data-fs="0" title="กลับเป็นขนาดตามแบบฟอร์ม">ค่าเดิม</button></span>
+        <span class="hint" id="pv-eff"></span>
+        <span class="pv-act"><button class="btn primary" id="pv-print">พิมพ์</button><button class="btn" id="pv-close">ปิด</button></span></div>`);
+      bar = $('#pv-bar');
+    }
+    let fs = getFs();
+    const apply = () => {
+      const z = fitPages(root, blocks, fs);
+      $('#pv-fsv').textContent = Math.round(fs * 100) + '%';
+      $('#pv-eff').textContent = z ? `ตัวอักษร 16 pt ในแบบฟอร์ม พิมพ์ออกมาประมาณ ${(16 * fs * z).toFixed(1)} pt (หน้าแรก)` : '';
+    };
+    const close = () => { document.body.classList.remove('previewing', 'printing'); root.innerHTML = ''; root.style.removeProperty('--fs'); document.removeEventListener('keydown', onKey); window.scrollTo(0, S.pvScroll || 0); };
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    $('#pv-n').textContent = blocks.length + ' หน้า';
+    bar.querySelectorAll('[data-fs]').forEach(btn => { btn.onclick = () => {
+      const d = +btn.dataset.fs; fs = d ? Math.min(FS_MAX, Math.max(FS_MIN, Math.round((fs + d * 0.1) * 10) / 10)) : 1; setFs(fs); apply();
+    }; });
+    $('#pv-close').onclick = close;
+    $('#pv-print').onclick = async () => {
+      document.body.classList.add('printing');
+      await new Promise(r => setTimeout(r, 60));
+      window.print();
+      setTimeout(() => document.body.classList.remove('printing'), 300);
+    };
+    document.addEventListener('keydown', onKey);
+    S.pvScroll = window.scrollY;
+    document.body.classList.add('previewing'); window.scrollTo(0, 0);
+    await new Promise(r => requestAnimationFrame(() => r()));
+    apply();
   }
   // พิมพ์แบบบันทึกคะแนนรายวิชา (หลายวิชาได้) เฉพาะส่วนที่เลือก
   function printScores(names, part) { printSheets(null, names.filter(n => S.wb.sheet(n)).flatMap(n => blocksFor(n, part))); }
@@ -591,7 +646,7 @@
     if (!items.length) { toast('ไม่มีเอกสารให้พิมพ์', 'warn'); return; }
     const old = {}; const blocks = [];
     for (const it of items) {
-      if (it.html) { blocks.push({ html: it.html, zoom: it.zoom || 1, land: false, m: [0.6, 0.6, 0.5, 0.5], hc: false, vc: false }); continue; }
+      if (it.html) { blocks.push({ html: it.html, zoom: it.zoom || 1, land: false, m: [0.6, 0.6, 0.5, 0.5], hc: false, vc: false, custom: true, fit: true }); continue; }
       if (it.subj !== undefined) { if (!(it.sheet in old)) old[it.sheet] = S.wb.get(S.wb.sheet(it.sheet), SUBJ_CELL.r, SUBJ_CELL.c); setCoverSubject(it.sheet, it.subj); }
       blocks.push(...blocksFor(it.sheet, it.part));
     }
