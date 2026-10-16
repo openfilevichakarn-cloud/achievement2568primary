@@ -6,10 +6,10 @@
 <meta name="theme-color" content="#1f5eff">
 <meta name="description" content="โปรแกรมแจ้งผลการศึกษา ปพ.5 และ ปพ.6 หลักสูตร 2568 ระดับประถมศึกษา ใช้งานผ่านเว็บ ทดลองใช้ฟรีก่อนสั่งซื้อ">
 <title>สมัครใช้งาน — โปรแกรมแจ้งผลการศึกษา ปพ.5 และ ปพ.6</title>
-<script src="js/theme.js?v=20261016j"></script>
-<link rel="stylesheet" href="css/app.css?v=20261016j">
-<link rel="stylesheet" href="css/ui.css?v=20261016j">
-<link rel="stylesheet" href="css/register.css?v=20261016j">
+<script src="js/theme.js?v=20261016k"></script>
+<link rel="stylesheet" href="css/app.css?v=20261016k">
+<link rel="stylesheet" href="css/ui.css?v=20261016k">
+<link rel="stylesheet" href="css/register.css?v=20261016k">
 </head>
 <body class="reg">
 
@@ -109,7 +109,7 @@
           <label class="fld"><span>วันและเวลาที่โอน (ตามสลิป) <b class="req">*</b></span><input name="transfer_at" type="datetime-local" required></label>
           <div class="fld"><span>รูปสลิปการโอนเงิน <b class="req">*</b></span>
             <label class="rg-slip"><input type="file" id="slip" accept="image/*"><span id="slip-label">📎 เลือกรูปสลิป</span></label></div>
-          <div class="fld full"><img id="slip-preview" class="rg-slipimg" alt="ตัวอย่างสลิป" hidden></div>
+          <div class="fld full"><img id="slip-preview" class="rg-slipimg" alt="ตัวอย่างสลิป" hidden><p id="slip-qr" class="hint" hidden></p></div>
           <label class="rg-hp" aria-hidden="true">เว็บไซต์ <input name="website" tabindex="-1" autocomplete="off"></label>
         </div>
         <label class="chk rg-consent"><input type="checkbox" id="consent"> <span>ยอมรับ<a href="#pdpa" id="pdpa-link">ข้อกำหนดการคุ้มครองข้อมูลส่วนบุคคล (PDPA)</a> และยินยอมให้ส่งรูปสลิปไปยังบริการตรวจสลิปเพื่อยืนยันการชำระเงิน</span></label>
@@ -155,7 +155,8 @@
 </footer>
 
 <div id="toasts" class="toasts" aria-live="polite"></div>
-<script src="js/config.js?v=20261016j"></script>
-<script src="js/register.js?v=20261016j"></script>
+<script src="js/config.js?v=20261016k"></script>
+<script src="js/vendor/jsQR.js?v=1.4.0"></script>
+<script src="js/register.js?v=20261016k"></script>
 </body>
 </html>

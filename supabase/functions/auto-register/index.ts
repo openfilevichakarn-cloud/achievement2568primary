@@ -13,6 +13,8 @@ const SLIP_KEY = Deno.env.get('EASYSLIP_API_KEY') || '';
 // จำลองเหตุการณ์สำหรับทดสอบ (ตั้ง Secret EASYSLIP_SIMULATE แล้วลบออกเมื่อทดสอบเสร็จ):
 //   quota = โควตาหมด · unauthorized = API key ผิด/หมดอายุ · down = บริการตรวจสลิปล่ม · invalid = สลิปอ่าน QR ไม่ได้
 const SIMULATE = (Deno.env.get('EASYSLIP_SIMULATE') || '').trim().toLowerCase();
+// เวอร์ชัน API: v1 (ค่าเริ่มต้น ส่งรูปสลิป) หรือ v2 (ส่งข้อความ QR ที่เว็บถอดจากรูปสลิป) — ตั้ง Secret EASYSLIP_VERSION=v2
+const VERSION = (Deno.env.get('EASYSLIP_VERSION') || 'v1').trim().toLowerCase();
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -62,12 +64,45 @@ const SYS = {
   down: '[ระบบ] ติดต่อบริการตรวจสลิป EasySlip ไม่ได้ — ตรวจคำสั่งซื้อนี้เอง',
   nokey: '[ระบบ] ยังไม่ได้ตั้งค่า EASYSLIP_API_KEY — ตรวจคำสั่งซื้อนี้เอง',
 };
-async function verifySlip(image: string): Promise<{ ok: true; slip: Slip } | Fail> {
+// ดึงค่าจากผลตรวจ (รองรับชื่อฟิลด์ทั้ง v1 / v2)
+function pickSlip(d: any): Slip {
+  const recv = d?.receiver || {}, acc = recv.account || {};
+  const amount = Number(d?.amount?.amount ?? d?.amount?.value ?? d?.amount);
+  const date = String(d?.date || d?.transDate && `${d.transDate}T${d.transTime || '00:00:00'}+07:00` || d?.transactionDate || d?.dateTime || '');
+  const account = String(acc.bank?.account || acc.proxy?.account || acc.value || acc.number || recv.bank?.account || recv.accountNumber || '');
+  return { amount, date, transRef: String(d?.transRef || d?.transactionId || d?.ref || ''), account,
+    name: String(acc.name?.th || acc.name?.en || recv.name?.th || recv.name || recv.displayName || ''), raw: d };
+}
+function classify(status: number, msg: string, raw: unknown): Fail {
+  if (/quota|limit|exceed|credit|insufficient/i.test(msg) || status === 429 || status === 402) return { ok: false, kind: 'system', reason: SYS.quota, raw };
+  if (status === 401 || /unauthori[sz]ed|invalid.?(api.?)?key|token|forbidden_key/i.test(msg)) return { ok: false, kind: 'system', reason: SYS.unauthorized, raw };
+  if (/slip_not_found|not_found|qrcode|invalid_payload|invalid_image|payload/i.test(msg) && status < 500) return { ok: false, kind: 'slip', reason: 'อ่าน QR บนสลิปไม่ได้ หรือไม่พบรายการโอนนี้ (' + msg + ')', raw };
+  return { ok: false, kind: 'system', reason: `[ระบบ] บริการตรวจสลิปตอบผิดพลาด (${msg}) — ตรวจคำสั่งซื้อนี้เอง`, raw };
+}
+// EasySlip API v2: POST https://api.easyslip.com/v2/verify/bank  { payload: "<ข้อความใน QR>" } -> { success, data } / { success:false, error:{ code, message } }
+async function verifyV2(qr: string): Promise<{ ok: true; slip: Slip } | Fail> {
+  if (!qr) return { ok: false, kind: 'slip', reason: 'อ่าน QR บนสลิปไม่ได้ (รูปไม่ชัด / ถูกครอป / ถ่ายจากหน้าจอ)' };
+  let r: Response;
+  try {
+    r = await fetch('https://api.easyslip.com/v2/verify/bank', {
+      method: 'POST', headers: { Authorization: `Bearer ${SLIP_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payload: qr }), signal: AbortSignal.timeout(20_000),
+    });
+  } catch (e) { return { ok: false, kind: 'system', reason: SYS.down, raw: { error: String(e) } }; }
+  const j = await r.json().catch(() => null);
+  if (!r.ok || !j || j.success === false || !j.data) {
+    const code = String(j?.error?.code || j?.code || j?.message || `HTTP ${r.status}`);
+    return classify(r.status, code + (j?.error?.message ? ' ' + j.error.message : ''), { status: r.status, body: j, api: 'v2' });
+  }
+  return { ok: true, slip: pickSlip(j.data) };
+}
+async function verifySlip(image: string, qr = ''): Promise<{ ok: true; slip: Slip } | Fail> {
   if (SIMULATE === 'quota') return { ok: false, kind: 'system', reason: SYS.quota + ' (จำลอง)', raw: { simulated: 'quota', status: 403, message: 'quota_exceeded' } };
   if (SIMULATE === 'unauthorized') return { ok: false, kind: 'system', reason: SYS.unauthorized + ' (จำลอง)', raw: { simulated: 'unauthorized', status: 401 } };
   if (SIMULATE === 'down') return { ok: false, kind: 'system', reason: SYS.down + ' (จำลอง)', raw: { simulated: 'down' } };
   if (SIMULATE === 'invalid') return { ok: false, kind: 'slip', reason: 'อ่าน QR บนสลิปไม่ได้ หรือไม่พบรายการโอนนี้ (จำลอง)', raw: { simulated: 'invalid' } };
   if (!SLIP_KEY) return { ok: false, kind: 'system', reason: SYS.nokey };
+  if (VERSION === 'v2') return verifyV2(qr);
   const fd = new FormData();
   fd.append('file', dataUrlToBlob(image), 'slip.jpg');
   let r: Response;
@@ -77,20 +112,11 @@ async function verifySlip(image: string): Promise<{ ok: true; slip: Slip } | Fai
   const j = await r.json().catch(() => null);
   if (!r.ok || !j || !j.data) {
     const msg = String((j && (j.message || j.error)) || `HTTP ${r.status}`);
-    if (/quota|limit|exceed|credit/i.test(msg) || r.status === 429) return { ok: false, kind: 'system', reason: SYS.quota, raw: { status: r.status, body: j } };
-    if (r.status === 401 || /unauthori[sz]ed|invalid.?(api.?)?key|token/i.test(msg)) return { ok: false, kind: 'system', reason: SYS.unauthorized, raw: { status: r.status, body: j } };
-    if (r.status >= 500 || r.status === 403) return { ok: false, kind: 'system', reason: `[ระบบ] บริการตรวจสลิปตอบผิดพลาด (${msg}) — ตรวจคำสั่งซื้อนี้เอง`, raw: { status: r.status, body: j } };
-    return { ok: false, kind: 'slip', reason: 'อ่าน QR บนสลิปไม่ได้ หรือไม่พบรายการโอนนี้ (' + msg + ')', raw: { status: r.status, body: j } };
+    const f = classify(r.status, msg, { status: r.status, body: j, api: 'v1' });
+    if (f.kind === 'system' && r.status === 403 && !/quota|limit|exceed|credit/i.test(msg)) f.reason = SYS.quota;   // v1: 403 = โควตาหมด / ไม่มีสิทธิ์
+    return f;
   }
-  const d = j.data, acc = d.receiver?.account || {};
-  return { ok: true, slip: {
-    amount: Number(d.amount?.amount ?? d.amount),
-    date: String(d.date || ''),
-    transRef: String(d.transRef || ''),
-    account: String(acc.bank?.account || acc.proxy?.account || ''),
-    name: String(acc.name?.th || acc.name?.en || ''),
-    raw: d,
-  } };
+  return { ok: true, slip: pickSlip(j.data) };
 }
 
 Deno.serve(async (req) => {
@@ -109,7 +135,7 @@ Deno.serve(async (req) => {
     if (!st.ok) return json(st);
     const S = st.settings || {}, tol = Number(S.time_tolerance_min || 15);
 
-    const v = await verifySlip(image);
+    const v = await verifySlip(image, String(order.slip_qr || '').slice(0, 1000));
     let ok = false, reason: string | null = null, transRef: string | null = null, slipInfo: unknown = null, system = false;
     if (!v.ok) { reason = v.reason; system = v.kind === 'system'; slipInfo = { error: v.reason, kind: v.kind, raw: v.raw ?? null }; }
     else {
