@@ -72,3 +72,10 @@ body.reg{height:auto;scroll-behavior:smooth}
 .rg-foot{border-top:1px solid var(--line);padding:28px 16px 40px;text-align:center}
 .rg-foot .row{justify-content:center;flex-wrap:wrap;gap:8px;margin-top:8px}
 .rg-top .btn{white-space:nowrap}
+.rg-pdpa{scroll-margin-top:70px}
+.rg-pdpa-body{color:var(--ink);line-height:1.7;margin-top:8px}
+.rg-pdpa-body p{color:var(--ink)}
+.rg-pdpa-body ol{padding-left:1.3rem;margin:.4rem 0}
+.rg-pdpa-body li{margin:.45rem 0}
+.rg-consent span{line-height:1.5}
+.rg-consent a{color:var(--brand)}

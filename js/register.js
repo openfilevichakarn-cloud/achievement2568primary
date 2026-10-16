@@ -64,6 +64,9 @@
     if (SALES.DEMO_URL) $('#demo-link').href = SALES.DEMO_URL;
     renderPackages();
     $('#contact').innerHTML = `<b>ติดต่อสอบถาม</b><div class="row">${contactHtml('ghost')}</div>`;
+    const openPdpa = () => { const d = $('#pdpa'); if (d) { d.open = true; setTimeout(() => d.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0); } };
+    $('#pdpa-link').addEventListener('click', (e) => { e.preventDefault(); openPdpa(); });
+    if (location.hash === '#pdpa') openPdpa();
     $('#all-grades').onclick = () => { const cb = $$('[name=grades]'); const on = !cb.every(x => x.checked); cb.forEach(x => { x.checked = on; }); };
     $('#reg-form').addEventListener('submit', async (e) => {
       e.preventDefault();
