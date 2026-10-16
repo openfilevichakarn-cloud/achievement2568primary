@@ -52,7 +52,7 @@ body.reg{height:auto;scroll-behavior:smooth}
 
 .rg-form{max-width:760px;margin:0 auto;padding:24px}
 .rg-form .full{grid-column:1/-1}
-.rg-form .req{color:var(--err)}
+.reg .req{color:var(--err);font-weight:700}
 .rg-grades{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;padding:6px 0}
 .reg label.chk{display:inline-flex;align-items:center;gap:.45rem;cursor:pointer}
 .reg label.chk input{width:18px;height:18px}
