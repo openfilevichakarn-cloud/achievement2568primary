@@ -86,7 +86,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ' + roomLabel(g, room) + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261016n');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261016p');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -558,23 +558,81 @@
   const FS_KEY = 'pp.printFs', FS_MIN = 0.8, FS_MAX = 1.8;
   function getFs() { try { const v = +localStorage.getItem(FS_KEY); return v >= FS_MIN && v <= FS_MAX ? v : 1; } catch (e) { return 1; } }
   function setFs(v) { try { localStorage.setItem(FS_KEY, String(v)); } catch (e) { /* ไม่มี storage ก็ใช้ได้ */ } }
-  // ใช้ขนาดตัวอักษร fs แล้วจัดแต่ละหน้าใหม่: ตัวอักษรใหญ่ขึ้นแถวจะสูงขึ้น หน้าที่ล้นกระดาษจะถูกย่อลงพอดีหน้า
+  // จัดหน้าพิมพ์แบบพอดีข้อความ (หน้าที่ตั้ง "พอดี 1 หน้า"): วางตารางเต็มความกว้างกระดาษที่ขนาดจริง (ซูม 100%)
+  // คอลัมน์ขยายตามข้อความ แถวสูงพอดีข้อความ ระยะบรรทัดชิด — ถ้ายังล้นกระดาษจึงย่อทั้งหน้าเท่าที่จำเป็น
+  function compactPrep(z) {
+    if (z._cmp !== undefined) return z._cmp;
+    const box = z.querySelector('.xlbox'), tb = box && box.querySelector('table.xl');
+    if (!tb) return (z._cmp = null);
+    const cols = [...tb.querySelectorAll('col')], rows = [...tb.rows];
+    const cw = cols.map(c => parseFloat(c.style.width) || 0);
+    // แถวที่มีข้อความ: สูงพอดีข้อความ / แถวว่าง (ระยะเว้น) คงความสูงตามแบบฟอร์ม
+    const rh = rows.map(tr => [...tr.cells].some(td => td.textContent.trim() || td.querySelector('img')) ? 0 : (parseFloat(tr.style.height) || 0));
+    const W = cw.reduce((a, x) => a + x, 0);
+    // รูปทรง/ตราโรงเรียนที่วางทับ: ผูกกับเซลล์ที่อยู่ใต้มุมซ้ายบน เพื่อย้ายตามเมื่อตารางเปลี่ยนขนาด
+    const tds = [...tb.querySelectorAll('td')];
+    const ovs = [...box.children].filter(el => el.matches('.xlshape, img.logo.ov')).map(el => {
+      const r = el.getBoundingClientRect(), x = r.left + 0.5, y = r.top + 0.5;
+      const td = tds.find(t => { const q = t.getBoundingClientRect(); return x >= q.left && x < q.right && y >= q.top && y < q.bottom; });
+      if (!td) return null;
+      const q = td.getBoundingClientRect();
+      return { el, td, fx: (x - q.left) / q.width, fy: (y - q.top) / q.height, w: parseFloat(el.style.width) || 0, h: parseFloat(el.style.height) || 0,
+        mh: parseFloat(el.style.maxHeight) || 0, mw: parseFloat(el.style.maxWidth) || 0 };
+    }).filter(Boolean);
+    // ข้อความที่ไหลทับช่องว่างข้าง ๆ (แบบ Excel) ไม่ให้ดันคอลัมน์ให้กว้างขึ้น
+    for (const td of tds) if (td.style.overflow === 'visible' && !td.querySelector('.spill')) td.innerHTML = `<div class="spill">${td.innerHTML}</div>`;
+    return (z._cmp = { box, tb, cols, rows, cw, rh, W, ovs });
+  }
+  function compactLayout(z, c, TW, rs) {
+    const s = TW / c.W;
+    z.style.zoom = 1; z.style.setProperty('--bw', '1px'); z.style.width = TW + 'px'; z.style.margin = '0 auto';
+    c.box.style.width = TW + 'px'; c.tb.style.width = TW + 'px'; c.tb.classList.add('cmp');
+    c.cols.forEach((col, i) => { col.style.width = (c.cw[i] * s) + 'px'; });
+    c.rows.forEach((tr, i) => { tr.style.height = c.rh[i] ? (c.rh[i] * rs) + 'px' : ''; });
+    const bx = c.box.getBoundingClientRect();
+    for (const v of c.ovs) {
+      const q = v.td.getBoundingClientRect(), st = v.el.style;
+      st.left = (q.left - bx.left + v.fx * q.width) + 'px'; st.top = (q.top - bx.top + v.fy * q.height) + 'px';
+      if (v.w) { st.width = (v.w * rs) + 'px'; st.height = (v.h * rs) + 'px'; }
+      if (v.mh) { st.maxHeight = (v.mh * rs) + 'px'; st.maxWidth = (v.mw * rs) + 'px'; }
+    }
+  }
+  // ใช้ขนาดตัวอักษร fs แล้วจัดแต่ละหน้าใหม่ — คืนอัตราย่อของหน้าแรก (ขนาดพิมพ์จริง = ขนาดในแบบฟอร์ม × fs × อัตราย่อ)
   function fitPages(root, blocks, fs) {
     root.style.setProperty('--fs', fs);
     let first = null; const firstIdx = blocks.findIndex(b => !b.custom);
     root.querySelectorAll('.pp-page').forEach((sec, i) => {
       const b = blocks[i], z = sec.firstElementChild;
       const setZ = (v) => { z.style.zoom = v; z.style.setProperty('--bw', (1 / v) + 'px'); };
-      setZ(b.zoom);
-      if (i === firstIdx) first = b.zoom;
-      if (!b.fit) return;   // หน้าที่ไม่ได้ตั้ง "พอดี 1 หน้า" คงขนาดตามแบบฟอร์ม
       const cs = getComputedStyle(sec), availH = sec.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
       const availW = sec.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      // จัดแบบพอดีข้อความ: หน้าที่ตั้งพอดี 1 หน้า หรือหน้าที่อยู่ใน 1 หน้ากระดาษอยู่แล้ว (ไม่แตะหน้าที่ยาวหลายหน้า)
+      if (z._cmp === undefined && !b.custom && !b.fit) { setZ(b.zoom); if (z.querySelector('tr.pbreak') || z.getBoundingClientRect().height > availH + 1) z._cmp = null; }
+      const c = !b.custom ? compactPrep(z) : null;
+      if (!c) { setZ(b.zoom); if (i === firstIdx) first = b.zoom; if (!b.fit) return; }
+      if (c) {
+        const rs = Math.min(1, availW / c.W);
+        // ลองความกว้างตาราง: เต็มกระดาษก่อน ถ้าล้นแนวตั้งลองขยายให้กว้างขึ้น (แถวที่ตัดบรรทัดจะเตี้ยลง) เลือกแบบที่ตัวอักษรใหญ่สุด
+        let TW = availW, best = null;
+        for (let it = 0; it < 4; it++) {
+          compactLayout(z, c, TW, rs);
+          const r = z.getBoundingClientRect();
+          const k = Math.min(1, availW / r.width, availH / r.height);
+          if (!best || k > best.k + 0.005) best = { k, TW };
+          if (k > 0.995) break;
+          const next = Math.max(availW, r.width) / k;
+          if (next > TW * 1.6 || Math.abs(next - TW) < 4) break;
+          TW = next;
+        }
+        if (best.TW !== TW) compactLayout(z, c, best.TW, rs);
+        const k = best.k < 0.995 ? best.k * 0.99 : 1;
+        setZ(k); if (i === firstIdx) first = k;
+        return;
+      }
       const r = z.getBoundingClientRect(); let k = 1;
       if (r.height > availH + 1) k = Math.min(k, availH / r.height);
       if (r.width > availW + 1) k = Math.min(k, availW / r.width);
-      const zz = k < 1 ? b.zoom * k * 0.995 : b.zoom;
-      if (k < 1) { setZ(zz); if (i === firstIdx) first = zz; }
+      if (k < 1) { const zz = b.zoom * k * 0.995; setZ(zz); if (i === firstIdx) first = zz; }
     });
     return first;
   }
@@ -616,6 +674,7 @@
     S.pvScroll = window.scrollY;
     document.body.classList.add('previewing'); window.scrollTo(0, 0);
     await new Promise(r => requestAnimationFrame(() => r()));
+    try { await document.fonts.ready; } catch (e) { /* ใช้ฟอนต์สำรอง */ }
     apply();
   }
   // พิมพ์แบบบันทึกคะแนนรายวิชา (หลายวิชาได้) เฉพาะส่วนที่เลือก
