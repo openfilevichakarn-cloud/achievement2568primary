@@ -162,7 +162,8 @@ body.previewing #pv-bar{display:flex;position:fixed;top:0;left:0;right:0;z-index
 img.logo.ov{position:absolute;object-fit:contain;pointer-events:none}
 /* หน้าพิมพ์แบบพอดีข้อความ: คอลัมน์ขยายตามข้อความ แถวสูงพอดีข้อความ ระยะบรรทัดชิด */
 table.xl.cmp{table-layout:auto}
-table.xl.cmp td{line-height:var(--cmp-lh,1.15);padding-top:0;padding-bottom:0;overflow:visible;overflow-x:clip}
+/* ระยะบรรทัด 1.3 + เว้นบนเล็กน้อย: ข้อความอยู่กลางช่อง สระบน/วรรณยุกต์และสระล่างไม่ชนเส้นตาราง (ใกล้เคียงความสูงแถวของ Excel สำหรับ TH Sarabun New) */
+table.xl.cmp td{line-height:var(--cmp-lh,1.3);padding-top:var(--cmp-pt,.08em);padding-bottom:0;overflow:visible;overflow-x:clip}
 table.xl.cmp .spill{width:0;overflow:visible;white-space:pre}
 table.xl td.sx{font-family:'TH Sarabun New','Sarabun',sans-serif}
 /* โหมดมืด: หรี่ภาพพื้นหลังหน้าเข้าสู่ระบบ */
