@@ -3,7 +3,7 @@
 window.PP_CONFIG = {
   SUPABASE_URL: '',
   SUPABASE_ANON_KEY: '',
-  BUILD: '20261016f',
+  BUILD: '20261016g',
   GRADES_READY: [1, 2, 3, 4, 5, 6],
   SAMPLE_DIR: 'sample',
   DEMO_SCHOOL: 'โรงเรียนสาธิตตัวอย่าง (เว็บทดลอง)',
