@@ -86,7 +86,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ' + roomLabel(g, room) + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261016t');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261016u');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -581,7 +581,11 @@
     }).filter(Boolean);
     // ข้อความที่ไหลทับช่องว่างข้าง ๆ (แบบ Excel) ไม่ให้ดันคอลัมน์ให้กว้างขึ้น
     for (const td of tds) if (td.style.overflow === 'visible' && !td.querySelector('.spill')) td.innerHTML = `<div class="spill">${td.innerHTML}</div>`;
-    return (z._cmp = { box, tb, cols, rows, cw, rh, W, ovs });
+    // ช่วงลายเซ็น: ตั้งแต่แถวจุดไข่ปลาแถวแรกลงไป (ไม่ยืด และระยะบรรทัดชิด)
+    let sig = rows.findIndex(tr => /\.{10,}/.test(tr.textContent));
+    if (sig < 0) sig = rows.length;
+    rows.forEach((tr, i) => { if (i >= sig && tr.textContent.trim()) tr.classList.add('sig'); });
+    return (z._cmp = { box, tb, cols, rows, cw, rh, W, ovs, sig });
   }
   function compactLayout(z, c, TW, rs) {
     const s = TW / c.W;
@@ -602,11 +606,11 @@
   }
   // หน้าปก / ปพ.6 (หน้า-หลัง): ยืดความสูงแถวทุกแถวตามสัดส่วนให้ตารางสูงเต็ม 1 หน้า A4 (ทุกหน้าสูงเท่ากัน)
   function stretchRows(z, c, target, rs) {
-    const hs = c.rows.map(tr => tr.getBoundingClientRect().height), sum = hs.reduce((a, x) => a + x, 0);
+    const hs = c.rows.map(tr => tr.getBoundingClientRect().height), sum = hs.slice(0, c.sig).reduce((a, x) => a + x, 0);
     const extra = target - z.getBoundingClientRect().height;
     if (extra < 2 || !sum) return;
-    const f = (sum + extra) / sum;
-    c.rows.forEach((tr, i) => { tr.style.height = (hs[i] * f) + 'px'; });
+    const f = (sum + extra) / sum;   // ยืดเฉพาะแถวเหนือช่วงลายเซ็น
+    c.rows.forEach((tr, i) => { if (i < c.sig) tr.style.height = (hs[i] * f) + 'px'; });
     placeOverlays(c, rs);
   }
   // ใช้ขนาดตัวอักษร fs แล้วจัดแต่ละหน้าใหม่ — คืนอัตราย่อของหน้าแรก (ขนาดพิมพ์จริง = ขนาดในแบบฟอร์ม × fs × อัตราย่อ)
