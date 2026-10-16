@@ -28,9 +28,9 @@ create table if not exists public.orders (
   id           uuid primary key default gen_random_uuid(),
   school       text not null,
   area         text,
-  contact      text not null,
+  contact      text,
   position     text,
-  phone        text not null,
+  phone        text,
   line_id      text,
   email        text,
   grades       smallint[] not null,
@@ -46,6 +46,8 @@ create table if not exists public.orders (
   created_at   timestamptz not null default now(),
   decided_at   timestamptz
 );
+-- แบบฟอร์มสั่งซื้อไม่ถามชื่อผู้ติดต่อ / เบอร์โทรแล้ว (ลูกค้าติดต่อทางแชทเพจด้วยเลขคำสั่งซื้อ)
+alter table public.orders alter column contact drop not null, alter column phone drop not null;
 create unique index if not exists orders_trans_ref_uq on public.orders (trans_ref) where trans_ref is not null and status in ('approved', 'review', 'checking');
 create index if not exists orders_ip_at on public.orders (ip, created_at);
 alter table public.orders enable row level security;
@@ -83,8 +85,6 @@ begin
   end if;
   t := btrim(coalesce(p->>'school', ''));
   if length(t) < 3 or length(t) > 200 then return jsonb_build_object('ok', false, 'error', 'กรุณากรอกชื่อโรงเรียน'); end if;
-  if length(btrim(coalesce(p->>'contact', ''))) < 2 then return jsonb_build_object('ok', false, 'error', 'กรุณากรอกชื่อผู้ติดต่อ'); end if;
-  if length(regexp_replace(coalesce(p->>'phone', ''), '\D', '', 'g')) < 9 then return jsonb_build_object('ok', false, 'error', 'กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง'); end if;
   select coalesce(array_agg(distinct x::smallint order by x::smallint), '{}') into g
     from jsonb_array_elements_text(coalesce(p->'grades', '[]')) x where x ~ '^[1-6]$';
   if cardinality(g) = 0 then return jsonb_build_object('ok', false, 'error', 'กรุณาเลือกชั้นที่ต้องการอย่างน้อย 1 ชั้น'); end if;
@@ -115,7 +115,7 @@ begin
   code := public._new_code();
   insert into public.schools(name, code_hash, grades, note)
   values (o.school, public._code_hash(code), public._clean_grades(o.grades),
-          'สั่งซื้อ ' || upper(left(replace(o.id::text, '-', ''), 6)) || ' · ' || o.contact || ' ' || o.phone || coalesce(' LINE ' || o.line_id, ''))
+          concat_ws(' ', 'สั่งซื้อ ' || upper(left(replace(o.id::text, '-', ''), 6)), nullif(concat_ws(' ', o.contact, o.phone, 'LINE ' || o.line_id), '')))
   returning id into sid;
   update public.orders set status = 'approved', school_id = sid, decided_at = now() where id = p_id;
   return jsonb_build_object('ok', true, 'code', code, 'school', o.school, 'grades', to_jsonb(public._clean_grades(o.grades)));

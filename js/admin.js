@@ -149,7 +149,7 @@
     $('#o-body').innerHTML = list.length ? list.map(o => `<tr data-id="${esc(o.id)}">
       <td class="hint">${fmtDate(o.created_at)}<br><b>${esc(o.ref)}</b></td>
       <td class="stk"><b>${esc(o.school)}</b>${o.area ? `<div class="hint">${esc(o.area)}</div>` : ''}</td>
-      <td>${esc(o.contact)}<div class="hint">โทร ${esc(o.phone)}${o.line_id ? ' · LINE ' + esc(o.line_id) : ''}${o.email ? '<br>' + esc(o.email) : ''}</div></td>
+      <td>${o.contact || o.phone || o.line_id || o.email ? `${esc(o.contact || '')}<div class="hint">${o.phone ? 'โทร ' + esc(o.phone) : ''}${o.line_id ? ' · LINE ' + esc(o.line_id) : ''}${o.email ? '<br>' + esc(o.email) : ''}</div>` : '<span class="hint">ทางแชทเพจ</span>'}</td>
       <td>${(o.grades || []).map(g => `<span class="chip">ป.${g}</span>`).join(' ')}<div><b>${baht(o.amount)}</b> บาท</div></td>
       <td class="hint">${o.slip_amount != null ? `สลิป ${baht(o.slip_amount)} บาท<br>${o.slip_date ? fmtDate(o.slip_date) : ''}` : ''}<br>กรอก ${o.transfer_at ? fmtDate(o.transfer_at) : '–'}${o.reason ? `<div class="err" style="min-height:0">${esc(o.reason)}</div>` : ''}</td>
       <td>${OST[o.status] || esc(o.status)}</td>
@@ -174,7 +174,7 @@
       if (!ok) return;
       const r = await call('admin_order_decide', { p_id: id, p_approve: true });
       await load();
-      await showCodes('ออกรหัสแล้ว — ส่งให้ลูกค้า (โทร ' + o.phone + (o.line_id ? ' / LINE ' + o.line_id : '') + ')', [{ name: o.school, code: r.code }]);
+      await showCodes('ออกรหัสแล้ว — ส่งให้ลูกค้าทางแชทเพจ (คำสั่งซื้อ ' + o.ref + (o.phone ? ' · โทร ' + o.phone : '') + ')', [{ name: o.school, code: r.code }]);
       return;
     }
     if (a === 'reject') {

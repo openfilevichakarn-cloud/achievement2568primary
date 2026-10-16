@@ -164,14 +164,11 @@
       const f = e.target, v = (n) => (f.elements[n].value || '').trim(), err = $('#reg-err');
       const g = grades(), amount = priceFor(g.length);
       const t = v('transfer_at'), tDate = t ? new Date(t) : null;
-      const order = { school: v('school'), area: v('area'), contact: v('contact'), position: v('position'), phone: v('phone'), line_id: v('line_id'),
-        email: v('email'), website: v('website'), grades: g, amount, transfer_at: tDate && !isNaN(tDate) ? tDate.toISOString() : '', slip_image: slipData, slip_qr: slipQr };
+      const order = { school: v('school'), website: v('website'), grades: g, amount, transfer_at: tDate && !isNaN(tDate) ? tDate.toISOString() : '', slip_image: slipData, slip_qr: slipQr };
       const bad = (msg, n) => { err.textContent = msg; if (n) f.elements[n].focus(); };
       if (!g.length) return bad('กรุณาเลือกชั้นที่ต้องการอย่างน้อย 1 ชั้น');
       if (amount == null) return bad('ยังไม่เปิดสั่งซื้อชั้นที่เลือก กรุณาติดต่อทางเพจ');
       if (order.school.length < 3) return bad('กรุณากรอกชื่อโรงเรียน', 'school');
-      if (order.contact.length < 2) return bad('กรุณากรอกชื่อผู้ติดต่อ', 'contact');
-      if (order.phone.replace(/\D/g, '').length < 9) return bad('กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง', 'phone');
       if (!order.transfer_at) return bad('กรุณากรอกวันและเวลาที่โอน', 'transfer_at');
       if (!slipData) return bad('กรุณาแนบรูปสลิปการโอนเงิน');
       if (!$('#consent').checked) return bad('กรุณาติ๊กยอมรับข้อกำหนดก่อนส่ง');
