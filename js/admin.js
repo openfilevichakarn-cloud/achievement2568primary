@@ -142,6 +142,10 @@
     $('#o-summary').innerHTML = S.price_per_grade == null && S.price_all == null
       ? '<span class="err">ยังไม่ได้ตั้งราคา — หน้าสั่งซื้อจะยังไม่เปิดขาย กด “ตั้งค่าราคา / บัญชี”</span>'
       : `ราคา ชั้นละ <b>${baht(S.price_per_grade)}</b> บาท${S.price_all != null ? ` · ทั้ง 6 ชั้น <b>${baht(S.price_all)}</b> บาท` : ''} · บัญชี ${esc(S.bank || '')} ${esc(S.account_no || '')} · ออกรหัสอัตโนมัติ: <b>${S.auto === false ? 'ปิด' : 'เปิด'}</b>`;
+    // เตือนเมื่อบริการตรวจสลิปมีปัญหา (โควตาหมด / API key ผิด / ล่ม) ภายใน 24 ชม.
+    const sys = A.orders.filter(o => o.status === 'review' && /^\[ระบบ\]/.test(o.reason || '') && Date.now() - Date.parse(o.created_at) < 86400000);
+    const al = $('#o-alert'); al.hidden = !sys.length;
+    if (sys.length) al.innerHTML = `⚠️ <b>ระบบตรวจสลิปอัตโนมัติมีปัญหา</b> — ${esc(sys[0].reason.replace(/^\[ระบบ\]\s*/, ''))}<br><small>${sys.length} คำสั่งซื้อใน 24 ชม. รอตรวจเอง · ลูกค้าเห็นข้อความ “รอเจ้าหน้าที่ตรวจ” (ไม่ได้รหัสอัตโนมัติจนกว่าจะแก้)</small>`;
     $('#o-body').innerHTML = list.length ? list.map(o => `<tr data-id="${esc(o.id)}">
       <td class="hint">${fmtDate(o.created_at)}<br><b>${esc(o.ref)}</b></td>
       <td class="stk"><b>${esc(o.school)}</b>${o.area ? `<div class="hint">${esc(o.area)}</div>` : ''}</td>

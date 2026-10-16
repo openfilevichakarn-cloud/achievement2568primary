@@ -10,6 +10,9 @@
 const URL_ = Deno.env.get('SUPABASE_URL')!;
 const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const SLIP_KEY = Deno.env.get('EASYSLIP_API_KEY') || '';
+// จำลองเหตุการณ์สำหรับทดสอบ (ตั้ง Secret EASYSLIP_SIMULATE แล้วลบออกเมื่อทดสอบเสร็จ):
+//   quota = โควตาหมด · unauthorized = API key ผิด/หมดอายุ · down = บริการตรวจสลิปล่ม · invalid = สลิปอ่าน QR ไม่ได้
+const SIMULATE = (Deno.env.get('EASYSLIP_SIMULATE') || '').trim().toLowerCase();
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -50,15 +53,34 @@ function accountMatches(masked: string, target: string): boolean {
 }
 
 type Slip = { amount: number; date: string; transRef: string; account: string; name: string; raw: unknown };
-async function verifySlip(image: string): Promise<{ ok: true; slip: Slip } | { ok: false; reason: string; raw?: unknown }> {
-  if (!SLIP_KEY) return { ok: false, reason: 'ยังไม่ได้ตั้งค่าบริการตรวจสลิป — รอผู้ดูแลตรวจ' };
+// kind: 'system' = ปัญหาฝั่งบริการตรวจสลิป (โควตาหมด / key ผิด / ล่ม) -> ลูกค้าไม่ผิด แจ้งข้อความกลาง ๆ และเตือนผู้ดูแล
+//       'slip'   = ปัญหาที่ตัวสลิป (อ่าน QR ไม่ได้ / ไม่พบรายการ)
+type Fail = { ok: false; kind: 'system' | 'slip'; reason: string; raw?: unknown };
+const SYS = {
+  quota: '[ระบบ] โควตาตรวจสลิป EasySlip หมด — เติมโควตา แล้วตรวจคำสั่งซื้อนี้เอง',
+  unauthorized: '[ระบบ] API key ของ EasySlip ไม่ถูกต้องหรือหมดอายุ — ตรวจ Secret EASYSLIP_API_KEY',
+  down: '[ระบบ] ติดต่อบริการตรวจสลิป EasySlip ไม่ได้ — ตรวจคำสั่งซื้อนี้เอง',
+  nokey: '[ระบบ] ยังไม่ได้ตั้งค่า EASYSLIP_API_KEY — ตรวจคำสั่งซื้อนี้เอง',
+};
+async function verifySlip(image: string): Promise<{ ok: true; slip: Slip } | Fail> {
+  if (SIMULATE === 'quota') return { ok: false, kind: 'system', reason: SYS.quota + ' (จำลอง)', raw: { simulated: 'quota', status: 403, message: 'quota_exceeded' } };
+  if (SIMULATE === 'unauthorized') return { ok: false, kind: 'system', reason: SYS.unauthorized + ' (จำลอง)', raw: { simulated: 'unauthorized', status: 401 } };
+  if (SIMULATE === 'down') return { ok: false, kind: 'system', reason: SYS.down + ' (จำลอง)', raw: { simulated: 'down' } };
+  if (SIMULATE === 'invalid') return { ok: false, kind: 'slip', reason: 'อ่าน QR บนสลิปไม่ได้ หรือไม่พบรายการโอนนี้ (จำลอง)', raw: { simulated: 'invalid' } };
+  if (!SLIP_KEY) return { ok: false, kind: 'system', reason: SYS.nokey };
   const fd = new FormData();
   fd.append('file', dataUrlToBlob(image), 'slip.jpg');
-  const r = await fetch('https://developer.easyslip.com/api/v1/verify', { method: 'POST', headers: { Authorization: `Bearer ${SLIP_KEY}` }, body: fd });
+  let r: Response;
+  try {
+    r = await fetch('https://developer.easyslip.com/api/v1/verify', { method: 'POST', headers: { Authorization: `Bearer ${SLIP_KEY}` }, body: fd, signal: AbortSignal.timeout(20_000) });
+  } catch (e) { return { ok: false, kind: 'system', reason: SYS.down, raw: { error: String(e) } }; }
   const j = await r.json().catch(() => null);
   if (!r.ok || !j || !j.data) {
-    const msg = (j && (j.message || j.error)) || `HTTP ${r.status}`;
-    return { ok: false, reason: /slip_not_found|qrcode|invalid_payload|invalid_image/i.test(String(msg)) ? 'อ่าน QR บนสลิปไม่ได้ หรือไม่พบรายการโอนนี้' : 'ตรวจสลิปไม่สำเร็จ (' + msg + ')', raw: j };
+    const msg = String((j && (j.message || j.error)) || `HTTP ${r.status}`);
+    if (/quota|limit|exceed|credit/i.test(msg) || r.status === 429) return { ok: false, kind: 'system', reason: SYS.quota, raw: { status: r.status, body: j } };
+    if (r.status === 401 || /unauthori[sz]ed|invalid.?(api.?)?key|token/i.test(msg)) return { ok: false, kind: 'system', reason: SYS.unauthorized, raw: { status: r.status, body: j } };
+    if (r.status >= 500 || r.status === 403) return { ok: false, kind: 'system', reason: `[ระบบ] บริการตรวจสลิปตอบผิดพลาด (${msg}) — ตรวจคำสั่งซื้อนี้เอง`, raw: { status: r.status, body: j } };
+    return { ok: false, kind: 'slip', reason: 'อ่าน QR บนสลิปไม่ได้ หรือไม่พบรายการโอนนี้ (' + msg + ')', raw: { status: r.status, body: j } };
   }
   const d = j.data, acc = d.receiver?.account || {};
   return { ok: true, slip: {
@@ -81,14 +103,15 @@ Deno.serve(async (req) => {
   if (!/^data:image\/(jpeg|png|webp);base64,/.test(image) || image.length > 1_500_000) return json({ ok: false, error: 'กรุณาแนบรูปสลิป (ไฟล์ภาพไม่เกิน ~1 MB)' });
   const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'unknown';
 
+  let st: any = null;
   try {
-    const st = await rpc('order_start', { p: order, p_ip: ip });
+    st = await rpc('order_start', { p: order, p_ip: ip });
     if (!st.ok) return json(st);
     const S = st.settings || {}, tol = Number(S.time_tolerance_min || 15);
 
     const v = await verifySlip(image);
-    let ok = false, reason: string | null = null, transRef: string | null = null, slipInfo: unknown = null;
-    if (!v.ok) { reason = v.reason; slipInfo = { error: v.reason, raw: v.raw ?? null }; }
+    let ok = false, reason: string | null = null, transRef: string | null = null, slipInfo: unknown = null, system = false;
+    if (!v.ok) { reason = v.reason; system = v.kind === 'system'; slipInfo = { error: v.reason, kind: v.kind, raw: v.raw ?? null }; }
     else {
       const s = v.slip; transRef = s.transRef || null;
       slipInfo = { amount: s.amount, date: s.date, account: s.account, name: s.name, transRef: s.transRef, raw: s.raw };
@@ -106,9 +129,18 @@ Deno.serve(async (req) => {
       ok = fails.length === 0; reason = fails.join(' · ') || null;
     }
     const fin = await rpc('order_finish', { p_id: st.id, p_ok: ok, p_trans_ref: transRef, p_slip: slipInfo, p_reason: reason });
+    // ปัญหาฝั่งระบบ (เช่น โควตาหมด): ไม่บอกรายละเอียดภายในกับลูกค้า
+    if (system && fin.status === 'review') fin.reason = 'ระบบตรวจสลิปอัตโนมัติไม่พร้อมใช้งานชั่วคราว เจ้าหน้าที่จะตรวจสลิปและส่งรหัสให้';
     return json({ ...fin, ref: st.ref, amount: st.amount });
   } catch (e) {
     console.error(e);
+    // บันทึกคำสั่งซื้อไปแล้ว: เก็บไว้ให้ผู้ดูแลตรวจ (ไม่ให้เว็บส่งซ้ำเป็นคำสั่งซื้อที่ 2)
+    if (st && st.id) {
+      try {
+        await rpc('order_finish', { p_id: st.id, p_ok: false, p_trans_ref: null, p_slip: { error: String(e) }, p_reason: '[ระบบ] ฟังก์ชันตรวจสลิปขัดข้อง — ตรวจคำสั่งซื้อนี้เอง' });
+        return json({ ok: true, status: 'review', ref: st.ref, amount: st.amount, reason: 'ระบบตรวจสลิปอัตโนมัติไม่พร้อมใช้งานชั่วคราว เจ้าหน้าที่จะตรวจสลิปและส่งรหัสให้' });
+      } catch (e2) { console.error(e2); }
+    }
     return json({ ok: false, error: 'ระบบขัดข้องชั่วคราว กรุณาลองใหม่ หรือติดต่อทางเพจ' }, 500);
   }
 });
