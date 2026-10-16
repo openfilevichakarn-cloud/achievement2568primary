@@ -286,3 +286,13 @@ details.man>summary .no{display:inline-grid;place-items:center;width:28px;height
 .bpages{margin:4px 0 0;padding-left:2.4rem}
 .bpages li{margin:2px 0;break-inside:avoid}
 .card label.chk{display:flex;gap:.5rem;align-items:center;margin:.35rem 0;cursor:pointer}
+/* จัดการห้องเรียน */
+.rooms-card{max-width:620px}
+.rm-row{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.rm-row>b{min-width:42px;padding-top:6px}
+.rm-chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.rm-chip{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;background:var(--panel);overflow:hidden}
+.rm-chip.cur{border-color:var(--brand);box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 25%,transparent)}
+.rm-chip button{border:0;background:none;font:inherit;color:var(--ink);cursor:pointer;padding:5px 10px}
+.rm-chip .rm-del{color:var(--err);padding:5px 9px 5px 4px;font-weight:700}
+.rm-chip .rm-open:hover{color:var(--brand)}
