@@ -21,3 +21,4 @@ table.a-table .stk{max-width:300px;min-width:180px;white-space:normal;overflow:v
 .login-card input[type=password]{width:100%;padding:.65rem .8rem;border:1px solid var(--line);border-radius:10px;background:var(--bg);font-size:1.1rem}
 @media (max-width:700px){ .a-wrap{padding:10px} #l-q{width:100% !important} }
 .gchk label.nr{color:var(--muted)}
+.o-alert{background:color-mix(in srgb,var(--err) 10%,transparent);border:1px solid var(--err);color:var(--ink);border-radius:10px;padding:10px 12px;margin:0 0 10px;line-height:1.5}
