@@ -164,8 +164,9 @@
     const o = A.orders.find(x => x.id === id); if (!o) return;
     if (a === 'slip') {
       const r = await call('admin_order_slip', { p_id: id });
-      await modal('สลิป ' + o.ref, r.image ? `<img src="${esc(r.image)}" alt="สลิป" style="max-width:100%;max-height:70vh;display:block;margin:0 auto;border-radius:8px">
-        <p class="hint">ยอดที่ต้องโอน <b>${baht(o.amount)}</b> บาท · เวลาที่ลูกค้ากรอก ${o.transfer_at ? fmtDate(o.transfer_at) : '–'}${o.trans_ref ? ' · เลขอ้างอิง ' + esc(o.trans_ref) : ''}</p>` : '<p>ไม่มีรูปสลิป</p>', [{ label: 'ปิด', value: null }]);
+      await modal('สลิป ' + o.ref, `${r.image ? `<img src="${esc(r.image)}" alt="สลิป" style="max-width:100%;max-height:70vh;display:block;margin:0 auto;border-radius:8px">
+        <p class="hint">ยอดที่ต้องโอน <b>${baht(o.amount)}</b> บาท · เวลาที่ลูกค้ากรอก ${o.transfer_at ? fmtDate(o.transfer_at) : '–'}${o.trans_ref ? ' · เลขอ้างอิง ' + esc(o.trans_ref) : ''}</p>` : '<p>ไม่มีรูปสลิป</p>'}
+        ${r.slip ? `<details style="margin-top:8px"><summary class="hint" style="cursor:pointer">ข้อมูลผลตรวจจาก EasySlip (สำหรับตรวจปัญหา)</summary><pre style="white-space:pre-wrap;word-break:break-all;font-size:.78rem;max-height:40vh;overflow:auto;background:var(--bg);padding:8px;border-radius:8px">${esc(JSON.stringify(r.slip, null, 2))}</pre></details>` : ''}`, [{ label: 'ปิด', value: null }]);
       return;
     }
     if (a === 'approve') {

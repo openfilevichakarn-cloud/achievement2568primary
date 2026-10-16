@@ -639,7 +639,8 @@ create or replace function public.admin_order_slip(p_pass text, p_id uuid) retur
 language plpgsql security definer set search_path = public, extensions as $$
 begin
   if not public._admin_ok(p_pass) then return jsonb_build_object('ok', false, 'error', 'รหัสผ่านผู้ดูแลไม่ถูกต้อง'); end if;
-  return jsonb_build_object('ok', true, 'image', (select slip_image from public.orders where id = p_id));
+  return jsonb_build_object('ok', true, 'image', (select slip_image from public.orders where id = p_id),
+    'slip', (select slip from public.orders where id = p_id));
 end $$;
 
 create or replace function public.admin_order_decide(p_pass text, p_id uuid, p_approve boolean) returns jsonb

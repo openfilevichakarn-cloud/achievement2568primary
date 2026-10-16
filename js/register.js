@@ -13,7 +13,7 @@
   const H = isDemo ? {} : { apikey: cfg.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + cfg.SUPABASE_ANON_KEY, 'Content-Type': 'application/json' };
   const fmt = (n) => Number(n).toLocaleString('th-TH', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 });
   const fmtAcc = (a) => { const d = String(a || '').replace(/\D/g, ''); return d.length === 10 ? `${d.slice(0, 3)}-${d[3]}-${d.slice(4, 9)}-${d[9]}` : a; };
-  let INFO = null, slipData = null;
+  let INFO = null, slipData = null, slipQr = null;
 
   function contactHtml(cls) {
     const items = [];
@@ -57,6 +57,18 @@
     if (!open) { $('#order-form').hidden = true; const c = $('#order-closed'); c.hidden = false; c.innerHTML = `<h3>ยังไม่เปิดสั่งซื้ออัตโนมัติ</h3><p>ติดต่อสั่งซื้อได้ที่ช่องทางนี้</p><div class="row">${contactHtml()}</div>`; }
   }
 
+  // อ่าน QR บนสลิป (EasySlip API v2 ตรวจจากข้อความใน QR) — ลองหลายขนาดเพราะ QR ในสลิปบางธนาคารเล็กมาก
+  function scanQr(img) {
+    if (!window.jsQR) return null;
+    for (const max of [1600, 1000, 2400]) {
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      const cv = document.createElement('canvas'); cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+      const g = cv.getContext('2d'); g.drawImage(img, 0, 0, cv.width, cv.height);
+      const r = window.jsQR(g.getImageData(0, 0, cv.width, cv.height).data, cv.width, cv.height, { inversionAttempts: 'attemptBoth' });
+      if (r && r.data) return r.data;
+    }
+    return null;
+  }
   // ย่อรูปสลิป (คงความคมของ QR) -> JPEG dataURL
   function readSlip(file) {
     return new Promise((resolve, reject) => {
@@ -65,6 +77,7 @@
         const k = Math.min(1, 1400 / Math.max(img.width, img.height));
         const cv = document.createElement('canvas'); cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
         const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(img, 0, 0, cv.width, cv.height);
+        try { slipQr = scanQr(img); } catch (e) { slipQr = null; }
         URL.revokeObjectURL(url); resolve(cv.toDataURL('image/jpeg', 0.9));
       };
       img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('อ่านไฟล์รูปไม่ได้')); };
@@ -136,8 +149,12 @@
     const now = new Date(Date.now() - new Date().getTimezoneOffset() * 60000); $('[name=transfer_at]').value = now.toISOString().slice(0, 16);
     $('#slip').addEventListener('change', async (e) => {
       const f = e.target.files[0]; if (!f) return;
-      try { slipData = await readSlip(f); $('#slip-preview').src = slipData; $('#slip-preview').hidden = false; $('#slip-label').textContent = '✓ ' + f.name; }
-      catch (x) { slipData = null; $('#reg-err').textContent = x.message; }
+      try {
+        slipData = await readSlip(f); $('#slip-preview').src = slipData; $('#slip-preview').hidden = false; $('#slip-label').textContent = '✓ ' + f.name;
+        const q = $('#slip-qr'); q.hidden = false;
+        q.innerHTML = slipQr ? '✓ อ่าน QR บนสลิปได้ — พร้อมตรวจอัตโนมัติ' : '⚠️ อ่าน QR บนสลิปไม่ได้ (ลองใช้รูปสลิปจากแอปธนาคารโดยตรง ไม่ครอปหรือถ่ายจากหน้าจอ) — ส่งได้ แต่อาจต้องรอเจ้าหน้าที่ตรวจ';
+        q.style.color = slipQr ? 'var(--ok)' : 'var(--warn)';
+      } catch (x) { slipData = null; slipQr = null; $('#reg-err').textContent = x.message; }
     });
     try { INFO = await loadInfo(); } catch (e) { INFO = { price_per_grade: null, price_all: null }; }
     renderPrice(); updateAmount();
@@ -148,7 +165,7 @@
       const g = grades(), amount = priceFor(g.length);
       const t = v('transfer_at'), tDate = t ? new Date(t) : null;
       const order = { school: v('school'), area: v('area'), contact: v('contact'), position: v('position'), phone: v('phone'), line_id: v('line_id'),
-        email: v('email'), website: v('website'), grades: g, amount, transfer_at: tDate && !isNaN(tDate) ? tDate.toISOString() : '', slip_image: slipData };
+        email: v('email'), website: v('website'), grades: g, amount, transfer_at: tDate && !isNaN(tDate) ? tDate.toISOString() : '', slip_image: slipData, slip_qr: slipQr };
       const bad = (msg, n) => { err.textContent = msg; if (n) f.elements[n].focus(); };
       if (!g.length) return bad('กรุณาเลือกชั้นที่ต้องการอย่างน้อย 1 ชั้น');
       if (amount == null) return bad('ยังไม่เปิดสั่งซื้อชั้นที่เลือก กรุณาติดต่อทางเพจ');
