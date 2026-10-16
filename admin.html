@@ -6,10 +6,10 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#1f5eff">
 <title>ผู้ดูแลระบบ — โปรแกรมแจ้งผลการศึกษา ปพ.5 และ ปพ.6</title>
-<script src="js/theme.js?v=20261016e"></script>
-<link rel="stylesheet" href="css/app.css?v=20261016e">
-<link rel="stylesheet" href="css/ui.css?v=20261016e">
-<link rel="stylesheet" href="css/admin.css?v=20261016e">
+<script src="js/theme.js?v=20261016f"></script>
+<link rel="stylesheet" href="css/app.css?v=20261016f">
+<link rel="stylesheet" href="css/ui.css?v=20261016f">
+<link rel="stylesheet" href="css/admin.css?v=20261016f">
 </head>
 <body class="admin">
 
@@ -32,15 +32,17 @@
     <div class="row"><a class="btn" href="./">เปิดโปรแกรม</a><button class="btn theme-btn" type="button" data-theme-toggle aria-label="สลับโหมดมืด/สว่าง">🌙</button><button id="a-logout" class="btn">ออก</button></div>
   </header>
   <div class="a-wrap">
-    <section class="card" id="r-card">
+    <section class="card" id="o-card">
       <div class="row sp" style="margin-bottom:8px">
-        <h3 style="margin:0">คำขอสมัครใช้งาน <span id="r-count" class="hint"></span></h3>
+        <h3 style="margin:0">คำสั่งซื้อ (สมัครใช้งานอัตโนมัติ) <span id="o-count" class="hint"></span></h3>
         <div class="row">
-          <div class="seg" id="r-filter"><button data-f="new" class="on">รอดำเนินการ</button><button data-f="all">ทั้งหมด</button></div>
-          <a class="btn" href="register.html" target="_blank" rel="noopener">เปิดหน้าสมัคร ↗</a>
+          <div class="seg" id="o-filter"><button data-f="wait" class="on">รอตรวจ</button><button data-f="all">ทั้งหมด</button></div>
+          <button class="btn" id="o-settings">ตั้งค่าราคา / บัญชี</button>
+          <a class="btn" href="register.html" target="_blank" rel="noopener">เปิดหน้าสั่งซื้อ ↗</a>
         </div>
       </div>
-      <div class="tw a-tw"><table class="t a-table"><thead><tr><th>วันที่ / เลขที่</th><th class="stk">โรงเรียน</th><th>ผู้ติดต่อ</th><th>ชั้น / ห้อง</th><th>ข้อความ</th><th>สถานะ</th><th style="min-width:210px">จัดการ</th></tr></thead><tbody id="r-body"></tbody></table></div>
+      <p class="hint" id="o-summary"></p>
+      <div class="tw a-tw"><table class="t a-table"><thead><tr><th>วันที่ / เลขที่</th><th class="stk">โรงเรียน</th><th>ผู้ติดต่อ</th><th>ชั้น / ยอด</th><th>ผลตรวจสลิป</th><th>สถานะ</th><th style="min-width:230px">จัดการ</th></tr></thead><tbody id="o-body"></tbody></table></div>
     </section>
 
     <section class="card" id="issue-card">
@@ -73,7 +75,7 @@
 <div id="modal" class="modal" hidden></div>
 <div id="toasts" class="toasts"></div>
 
-<script src="js/config.js?v=20261016e"></script>
-<script src="js/admin.js?v=20261016e"></script>
+<script src="js/config.js?v=20261016f"></script>
+<script src="js/admin.js?v=20261016f"></script>
 </body>
 </html>
