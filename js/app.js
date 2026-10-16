@@ -86,7 +86,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ' + roomLabel(g, room) + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261016y');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261016z');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -183,11 +183,13 @@
     M.update1Full(ctx());
   }
 
-  // ชื่อชั้นในเอกสาร (รายวิชา!C2 ใช้ในสูตรของเอกสารทุกฉบับ): ถ้าครูยังไม่ได้แก้เอง ใส่ห้องให้อัตโนมัติเมื่อชั้นนั้นมีหลายห้อง
+  // ชื่อชั้นในเอกสาร (รายวิชา!C2 ใช้ในสูตรของเอกสารทุกฉบับ): ล็อกตามชั้น/ห้องที่เปิดอยู่ เช่น ป.1/1 = ประถมศึกษาปีที่ 1/1 (แก้เองไม่ได้)
+  function classText() { return 'ประถมศึกษาปีที่ ' + S.grade + '/' + S.room; }
   function roomClassLabel() {
-    if ((S.userEdits['รายวิชา'] || {}).C2 !== undefined || !S.wb.sheet('รายวิชา')) return;
-    const multi = S.room > 1 || (S.rooms[S.grade] || []).length > 1;
-    S.wb.setValue('รายวิชา', 'C2', 'ประถมศึกษาปีที่ ' + S.grade + (multi ? '/' + S.room : ''));
+    if (!S.wb.sheet('รายวิชา')) return;
+    S.wb.setValue('รายวิชา', 'C2', classText());
+    S.view.locked.add('รายวิชา!C2');
+    delete (S.userEdits['รายวิชา'] || {}).C2;
   }
 
   function lockSchoolName() {
@@ -802,6 +804,6 @@
   document.addEventListener('DOMContentLoaded', boot);
   window.PPApp = {
     S, ctx, toast, roomLabel, modal, applyValue, validate, markDirty, save, batch, printSheets, printOne, printAll, printBlock,
-    applyToSchool, otherRoomCount, openDoc, closeDoc, refreshDoc, printSet, printScores, exportBackup, pickBackup, openCover, pickLogo: () => $('#logo-file').click(), removeLogo, setStatus, flushSave,
+    applyToSchool, otherRoomCount, classText, openDoc, closeDoc, refreshDoc, printSet, printScores, exportBackup, pickBackup, openCover, pickLogo: () => $('#logo-file').click(), removeLogo, setStatus, flushSave,
   };
 })();

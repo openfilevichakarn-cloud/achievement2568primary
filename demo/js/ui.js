@@ -213,7 +213,7 @@
         ${field('ชื่อโรงเรียน (ล็อกตามรหัสสิทธิ์ แก้ไม่ได้)', `<input type="text" value="${esc(S.school.name)}" disabled>`)}
         ${field('ปีการศึกษา (พ.ศ.)', inputFor(i, 9, 2, { kind: 'n', mode: 'numeric', ph: '2569' }))}
         ${field('สังกัด (จังหวัด / เขตพื้นที่)', inputFor(i, 4, 2))}
-        ${field('ชั้น', inputFor(L.sub, 2, 3))}
+        ${field('ชั้น (ล็อกตามชั้น/ห้องที่เลือก)', `<input type="text" value="${esc(A().classText())}" disabled>`)}
         ${field('ชื่อ-สกุล ครูประจำชั้น', inputFor(i, 5, 2))}
         ${field('ชื่อ-สกุล หัวหน้างานวิชาการ', inputFor(i, 6, 2))}
         ${field('ชื่อ-สกุล รองผู้อำนวยการ (ถ้าไม่มี เว้นว่าง ระบบจะซ่อนลายเซ็น)', inputFor(i, 7, 2, { after: 'noop' }))}
