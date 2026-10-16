@@ -14,7 +14,7 @@
   };
 
   const S = {
-    code: null, school: null, grade: 1, data: null, wb: null, styles: null, names: null,
+    code: null, school: null, grade: 1, room: 1, rooms: {}, data: null, wb: null, styles: null, names: null,
     view: { rowHidden: {}, colHidden, bg: {}, locked: new Set(), logo: null },
     userEdits: {}, version: 0, dirty: false, saving: false, active: null, editing: null, sel: null,
     dvCache: {}, zoom: 'fit', saveTimer: null, offline: false,
@@ -57,10 +57,15 @@
       const granted = res.grades && res.grades.length ? res.grades : [1];
       const grades = granted.filter(g => ready.includes(g));
       if (!grades.length) throw new Error('ชั้นที่โรงเรียนได้รับสิทธิ์ (ป.' + granted.join(', ป.') + ') ยังไม่เปิดให้ใช้งาน กรุณาติดต่อผู้ดูแล');
-      S.code = code; S.school = { name: res.school_name, grades };
+      S.code = code; S.school = { name: res.school_name, grades, logo: res.logo || null };
+      // ห้องเรียนที่มีข้อมูลแล้ว (ชั้นที่ยังไม่มี = ห้อง 1)
+      S.rooms = {};
+      for (const x of res.rooms || []) if (grades.includes(x.grade)) (S.rooms[x.grade] = S.rooms[x.grade] || []).push(x.room);
+      for (const g of grades) S.rooms[g] = [...new Set(S.rooms[g] && S.rooms[g].length ? S.rooms[g] : [1])].sort((a, b) => a - b);
       if (remember) LS.set('pp_code', code); else LS.del('pp_code');
-      const last = +LS.get('pp_grade');
-      await openGrade(S.school.grades.includes(last) ? last : S.school.grades[0]);
+      const last = +LS.get('pp_grade'), lastRoom = +LS.get('pp_room') || 1;
+      const g0 = S.school.grades.includes(last) ? last : S.school.grades[0];
+      await openGrade(g0, S.rooms[g0].includes(lastRoom) ? lastRoom : S.rooms[g0][0]);
     } catch (e) {
       $('#login-err').textContent = e.offline ? 'เชื่อมต่ออินเทอร์เน็ตไม่ได้ กรุณาลองใหม่' : (e.message || 'เข้าสู่ระบบไม่สำเร็จ');
       LS.del('pp_code');
@@ -73,12 +78,15 @@
   }
 
   // ---------------------------------------------------------------- open workbook
-  async function openGrade(g) {
-    S.grade = g; LS.set('pp_grade', String(g));
+  const roomLabel = (g, r) => 'ป.' + g + '/' + r;
+  async function openGrade(g, room) {
+    room = room || (S.rooms[g] && S.rooms[g][0]) || 1;
+    S.grade = g; S.room = room; LS.set('pp_grade', String(g)); LS.set('pp_room', String(room));
+    if (!S.rooms[g].includes(room)) S.rooms[g] = [...S.rooms[g], room].sort((a, b) => a - b);
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
-    $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ป.' + g + ' ...';
+    $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ' + roomLabel(g, room) + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261015q');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261016a');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -93,7 +101,7 @@
     $('#loading-msg').textContent = 'กำลังโหลดข้อมูลของโรงเรียน...';
     let doc = null;
     try {
-      const res = await backend.load(S.code, g);
+      const res = await backend.load(S.code, g, room);
       S.version = (res && res.version) || 0; doc = res && res.data;
       S.offline = false;
     } catch (e) {
@@ -104,14 +112,14 @@
     }
     applyDoc(doc);
     $('#school-name').textContent = S.school.name;
-    $('#grade-label').textContent = 'ป.' + g;
+    $('#grade-label').textContent = roomLabel(g, room);
     buildGradeSwitch();
     $('#loading').hidden = true;
     window.PPUI.mount();
     setStatus(S.offline ? 'ออฟไลน์ (ใช้ข้อมูลในเครื่อง)' : 'พร้อมใช้งาน', S.offline ? 'warn' : 'ok');
   }
 
-  function draftKey() { return 'pp_draft_' + P_hash(S.code) + '_' + S.grade; }
+  function draftKey() { return 'pp_draft_' + P_hash(S.code) + '_' + S.grade + (S.room > 1 ? '_' + S.room : ''); }
   function P_hash(s) { let h = 5381; for (const ch of String(s)) h = ((h << 5) + h + ch.charCodeAt(0)) | 0; return (h >>> 0).toString(36); }
 
   function ctx() { return { wb: S.wb, view: S.view, names: S.names, toast }; }
@@ -166,10 +174,20 @@
         for (const [ref, val] of Object.entries(m)) { wb.setValue(sheet, ref, val); (S.userEdits[sheet] = S.userEdits[sheet] || {})[ref] = val; }
       }
     }
-    if (doc && doc.logo) S.view.logo = doc.logo;
+    // ตราโรงเรียนเก็บที่เดียวต่อโรงเรียน — ข้อมูลรุ่นเก่าที่เก็บตราไว้ในข้อมูลชั้น: ย้ายขึ้นไปที่โรงเรียนครั้งแรกที่เปิด
+    if (!S.school.logo && doc && doc.logo) { S.school.logo = doc.logo; backend.setLogo(S.code, doc.logo).catch(() => {}); }
+    S.view.logo = S.school.logo || null;
     lockSchoolName();
+    roomClassLabel();
     // ผลลัพธ์ของมาโครคำนวณใหม่จากข้อมูลที่กรอก
     M.update1Full(ctx());
+  }
+
+  // ชื่อชั้นในเอกสาร (รายวิชา!C2 ใช้ในสูตรของเอกสารทุกฉบับ): ถ้าครูยังไม่ได้แก้เอง ใส่ห้องให้อัตโนมัติเมื่อชั้นนั้นมีหลายห้อง
+  function roomClassLabel() {
+    if ((S.userEdits['รายวิชา'] || {}).C2 !== undefined || !S.wb.sheet('รายวิชา')) return;
+    const multi = S.room > 1 || (S.rooms[S.grade] || []).length > 1;
+    S.wb.setValue('รายวิชา', 'C2', 'ประถมศึกษาปีที่ ' + S.grade + (multi ? '/' + S.room : ''));
   }
 
   function lockSchoolName() {
@@ -182,9 +200,62 @@
   // ---------------------------------------------------------------- navigation
   function buildGradeSwitch() {
     const sel = $('#grade-switch');
-    if (S.school.grades.length < 2) { sel.hidden = true; return; }
-    sel.hidden = false; sel.innerHTML = S.school.grades.map(g => `<option value="${g}"${g === S.grade ? ' selected' : ''}>ป.${g}</option>`).join('');
-    sel.onchange = async () => { await flushSave(); openGrade(+sel.value); };
+    sel.hidden = false;
+    sel.innerHTML = S.school.grades.map(g => `<optgroup label="ชั้น ป.${g}">${S.rooms[g].map(r => `<option value="${g}-${r}"${g === S.grade && r === S.room ? ' selected' : ''}>${roomLabel(g, r)}</option>`).join('')}</optgroup>`).join('')
+      + '<option value="manage">⚙ จัดการห้องเรียน…</option>';
+    sel.onchange = async () => {
+      if (sel.value === 'manage') { sel.value = S.grade + '-' + S.room; manageRooms(); return; }
+      const [g, r] = sel.value.split('-').map(Number);
+      await flushSave(); openGrade(g, r);
+    };
+  }
+  // จัดการห้องเรียน: เพิ่ม / ลบห้อง (ชั้นละไม่เกิน 10 ห้อง) — ใช้รหัสโรงเรียนเดียวกันทุกห้อง
+  const MAX_ROOMS = 10;
+  function manageRooms() {
+    const root = $('#modal');
+    const draw = () => {
+      root.innerHTML = `<div class="modal-card rooms-card" role="dialog" aria-modal="true"><h3>จัดการห้องเรียน</h3><div class="modal-body">
+        <p class="hint">แต่ละห้องมีข้อมูลแยกกัน (นักเรียน คะแนน ผลประเมิน) · ชั้นละไม่เกิน ${MAX_ROOMS} ห้อง · ทุกห้องใช้รหัสโรงเรียนเดียวกัน</p>
+        ${S.school.grades.map(g => `<div class="rm-row"><b>ป.${g}</b><div class="rm-chips">${S.rooms[g].map(r => `<span class="rm-chip${g === S.grade && r === S.room ? ' cur' : ''}"><button class="rm-open" data-g="${g}" data-r="${r}" title="เปิดห้องนี้">${roomLabel(g, r)}</button>${S.rooms[g].length > 1 ? `<button class="rm-del" data-g="${g}" data-r="${r}" aria-label="ลบ ${roomLabel(g, r)}" title="ลบห้องนี้">×</button>` : ''}</span>`).join('')}
+          ${S.rooms[g].length < MAX_ROOMS ? `<button class="btn sm rm-add" data-g="${g}">＋ เพิ่มห้อง</button>` : '<span class="hint">ครบ 10 ห้องแล้ว</span>'}</div></div>`).join('')}
+        </div><div class="modal-actions"><button class="btn primary" data-x>ปิด</button></div></div>`;
+      root.hidden = false;
+    };
+    const close = () => { root.hidden = true; root.innerHTML = ''; root.onclick = null; };
+    root.onclick = async (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.hasAttribute('data-x')) { close(); return; }
+      const g = +b.dataset.g, r = +b.dataset.r;
+      if (b.classList.contains('rm-open')) { close(); await flushSave(); openGrade(g, r); return; }
+      if (b.classList.contains('rm-add')) {
+        const n = Array.from({ length: MAX_ROOMS }, (_, i) => i + 1).find(x => !S.rooms[g].includes(x)); if (!n) return;
+        b.disabled = true;
+        try {
+          // ห้องเดิมที่ยังไม่เคยบันทึก (เช่น ห้อง 1 ที่ยังว่าง) บันทึกไว้ก่อน ไม่ให้หายจากรายการเมื่อเข้าระบบครั้งหน้า
+          await flushSave();
+          for (const r0 of S.rooms[g]) {
+            if (g === S.grade && r0 === S.room && S.version > 0) continue;
+            const cur = await backend.load(S.code, g, r0);
+            if (cur && !cur.version) await backend.save(S.code, g, r0, cur.data || { v: 3, grade: g, room: r0, cells: {}, savedAt: new Date().toISOString() }, 0, false);
+          }
+          const res = await backend.save(S.code, g, n, { v: 3, grade: g, room: n, cells: {}, savedAt: new Date().toISOString() }, 0, false);
+          if (!res || res.ok === false) throw new Error((res && res.error) || 'เพิ่มห้องไม่สำเร็จ');
+        } catch (x) { toast(x.message || 'เพิ่มห้องไม่สำเร็จ', 'warn'); b.disabled = false; return; }
+        S.rooms[g] = [...S.rooms[g], n].sort((a, c) => a - c);
+        close(); await flushSave(); toast('เพิ่มห้อง ' + roomLabel(g, n) + ' แล้ว', 'ok'); openGrade(g, n); return;
+      }
+      if (b.classList.contains('rm-del')) {
+        if (!confirm(`ลบห้อง ${roomLabel(g, r)} พร้อมข้อมูลทั้งหมดของห้องนี้ (นักเรียน คะแนน ผลประเมิน)?\nย้อนกลับไม่ได้ — แนะนำให้กด “สำรองข้อมูล” ที่หน้าแรกก่อน`)) return;
+        try { const res = await backend.deleteRoom(S.code, g, r); if (res && res.ok === false) throw new Error(res.error); }
+        catch (x) { toast('ลบห้องไม่สำเร็จ: ' + (x.message || ''), 'warn'); return; }
+        S.rooms[g] = S.rooms[g].filter(x => x !== r);
+        LS.del('pp_draft_' + P_hash(S.code) + '_' + g + (r > 1 ? '_' + r : ''));
+        toast('ลบห้อง ' + roomLabel(g, r) + ' แล้ว', 'ok');
+        if (g === S.grade && r === S.room) { S.dirty = false; clearTimeout(S.saveTimer); close(); openGrade(g, S.rooms[g][0]); return; }
+        buildGradeSwitch(); draw();
+      }
+    };
+    draw();
   }
 
   // ---------------------------------------------------------------- data validation
@@ -326,23 +397,30 @@
     if (!file) return;
     const img = new Image(); const url = URL.createObjectURL(file);
     img.onload = () => {
-      const max = 360; const k = Math.min(1, max / Math.max(img.width, img.height));
+      const max = 300; const k = Math.min(1, max / Math.max(img.width, img.height));
       const cv = document.createElement('canvas'); cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
       cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-      S.view.logo = cv.toDataURL('image/png');
+      const logo = cv.toDataURL('image/png');
       URL.revokeObjectURL(url);
-      markDirty(); refreshDoc(); if (window.PPUI) PPUI.refresh(); toast('ใส่ตราโรงเรียนในหน้าปกและ ปพ.6 เรียบร้อยแล้ว', 'ok');
+      backend.setLogo(S.code, logo).then((res) => {
+        if (res && res.ok === false) throw new Error(res.error);
+        S.school.logo = S.view.logo = logo;
+        refreshDoc(); if (window.PPUI) PPUI.refresh(); toast('ใส่ตราโรงเรียนแล้ว (ใช้กับทุกชั้น ทุกห้อง)', 'ok');
+      }).catch((e) => toast('บันทึกตราไม่สำเร็จ: ' + (e.message || ''), 'warn'));
     };
     img.onerror = () => { toast('อ่านไฟล์รูปไม่ได้', 'warn'); };
     img.src = url;
   }
   async function removeLogo() {
     const yes = await modal('ตราโรงเรียน', '<p>ต้องการลบตราโรงเรียนออกจากทุกชีทใช่หรือไม่</p>', [{ label: 'ยกเลิก', value: false }, { label: 'ลบตรา', value: true, primary: true }]);
-    if (yes) { S.view.logo = null; markDirty(); refreshDoc(); if (window.PPUI) PPUI.refresh(); }
+    if (!yes) return;
+    try { const res = await backend.setLogo(S.code, null); if (res && res.ok === false) throw new Error(res.error); }
+    catch (e) { toast('ลบตราไม่สำเร็จ: ' + (e.message || ''), 'warn'); return; }
+    S.school.logo = S.view.logo = null; refreshDoc(); if (window.PPUI) PPUI.refresh();
   }
 
   // ---------------------------------------------------------------- save
-  function buildDoc() { return { v: 3, grade: S.grade, cells: S.userEdits, logo: S.view.logo || null, active: S.active, savedAt: new Date().toISOString() }; }
+  function buildDoc() { return { v: 3, grade: S.grade, room: S.room, cells: S.userEdits, active: S.active, savedAt: new Date().toISOString() }; }
   function markDirty() {
     if (S.batch) { S.pendingDirty = true; S.dirty = true; return; }
     S.dirty = true; setStatus('มีการแก้ไข... (จะบันทึกอัตโนมัติ)', 'dirty');
@@ -355,7 +433,7 @@
     S.saving = true; setStatus('กำลังบันทึก...', 'saving');
     const snapshot = buildDoc();
     try {
-      const res = await backend.save(S.code, S.grade, snapshot, S.version, force === true);
+      const res = await backend.save(S.code, S.grade, S.room, snapshot, S.version, force === true);
       if (res && res.conflict) {
         S.saving = false;
         const choice = await modal('ข้อมูลถูกแก้ไขจากเครื่องอื่น', '<p>มีการบันทึกข้อมูลใหม่กว่าจากอีกเครื่องหรืออีกแท็บ</p><p>ต้องการ <b>โหลดข้อมูลล่าสุด</b> (ข้อมูลที่แก้ในหน้านี้จะหายไป) หรือ <b>บันทึกทับ</b> ด้วยข้อมูลในหน้านี้?</p>',
@@ -375,22 +453,23 @@
 
   // ---------------------------------------------------------------- สำรองข้อมูล (ไฟล์ .json ทุกชั้นที่โรงเรียนมีสิทธิ์)
   const BACKUP_TAG = 'pp56-backup';
+  // ไฟล์รุ่น 2: rooms = { "ชั้น/ห้อง": ข้อมูล } + ตราโรงเรียน  (รุ่น 1: grades = { ชั้น: ข้อมูล } = ห้อง 1)
   async function exportBackup() {
     await flushSave();
-    const grades = {};
-    for (const g of S.school.grades) {
-      if (g === S.grade) { grades[g] = buildDoc(); continue; }
-      try { const res = await backend.load(S.code, g); if (res && res.data) grades[g] = res.data; }
-      catch (e) { toast('โหลดข้อมูล ป.' + g + ' ไม่ได้ — ' + (e.message || ''), 'warn'); return; }
+    const rooms = {};
+    for (const g of S.school.grades) for (const r of S.rooms[g]) {
+      if (g === S.grade && r === S.room) { rooms[g + '/' + r] = buildDoc(); continue; }
+      try { const res = await backend.load(S.code, g, r); if (res && res.data) rooms[g + '/' + r] = res.data; }
+      catch (e) { toast('โหลดข้อมูล ' + roomLabel(g, r) + ' ไม่ได้ — ' + (e.message || ''), 'warn'); return; }
     }
-    const file = { app: BACKUP_TAG, ver: 1, school: S.school.name, exportedAt: new Date().toISOString(), grades };
+    const file = { app: BACKUP_TAG, ver: 2, school: S.school.name, exportedAt: new Date().toISOString(), logo: S.school.logo || null, rooms };
     const d = new Date(), pad = (x) => String(x).padStart(2, '0');
     const name = `backup-pp5-pp6_${d.getFullYear() + 543}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.json`;   // ชื่อไฟล์ภาษาอังกฤษ: บางเบราว์เซอร์ไม่รองรับชื่อภาษาไทย
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(file)], { type: 'application/json' }));
     a.download = name; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-    toast('ดาวน์โหลดไฟล์สำรองแล้ว (' + Object.keys(grades).map(g => 'ป.' + g).join(', ') + ')', 'ok');
+    toast('ดาวน์โหลดไฟล์สำรองแล้ว (' + Object.keys(rooms).length + ' ห้อง)', 'ok');
   }
   function pickBackup() {
     const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,application/json';
@@ -400,31 +479,37 @@
   async function importBackup(f) {
     let file;
     try { file = JSON.parse(await f.text()); } catch (e) { file = null; }
-    if (!file || file.app !== BACKUP_TAG || !file.grades || typeof file.grades !== 'object') { toast('ไฟล์นี้ไม่ใช่ไฟล์สำรองข้อมูลของโปรแกรม', 'warn'); return; }
-    const gs = Object.keys(file.grades).map(Number).filter(g => S.school.grades.includes(g) && file.grades[g] && file.grades[g].cells);
-    const skip = Object.keys(file.grades).map(Number).filter(g => !gs.includes(g));
-    if (!gs.length) { toast('ไฟล์สำรองไม่มีข้อมูลของชั้นที่โรงเรียนนี้ใช้งาน', 'warn'); return; }
+    const src = file && file.app === BACKUP_TAG ? (file.rooms || (file.grades && Object.fromEntries(Object.entries(file.grades).map(([g, d]) => [g + '/1', d])))) : null;
+    if (!src || typeof src !== 'object') { toast('ไฟล์นี้ไม่ใช่ไฟล์สำรองข้อมูลของโปรแกรม', 'warn'); return; }
+    const all = Object.entries(src).map(([k, doc]) => { const [g, r] = k.split('/').map(Number); return { g, r, doc }; }).filter(x => x.doc && x.doc.cells);
+    const list = all.filter(x => S.school.grades.includes(x.g) && x.r >= 1 && x.r <= MAX_ROOMS).sort((a, b) => a.g - b.g || a.r - b.r);
+    const skip = all.filter(x => !list.includes(x));
+    if (!list.length) { toast('ไฟล์สำรองไม่มีข้อมูลของชั้นที่โรงเรียนนี้ใช้งาน', 'warn'); return; }
     const when = file.exportedAt ? new Date(file.exportedAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : '-';
     const other = file.school && file.school !== S.school.name;
     const yes = await modal('นำเข้าข้อมูลสำรอง', `<p>ไฟล์สำรองของ <b>${esc(file.school || '-')}</b> เมื่อ ${esc(when)}</p>
       ${other ? '<p class="err">ชื่อโรงเรียนในไฟล์ไม่ตรงกับโรงเรียนที่เข้าสู่ระบบอยู่</p>' : ''}
-      <p>ข้อมูลปัจจุบันของ <b>${gs.map(g => 'ป.' + g).join(', ')}</b> จะถูก<b>แทนที่ทั้งหมด</b>ด้วยข้อมูลในไฟล์ (ย้อนกลับไม่ได้)</p>
-      ${skip.length ? `<p class="hint">ข้าม ${skip.map(g => 'ป.' + g).join(', ')} (โรงเรียนนี้ไม่มีสิทธิ์ชั้นนี้)</p>` : ''}
+      <p>ข้อมูลปัจจุบันของ <b>${list.map(x => roomLabel(x.g, x.r)).join(', ')}</b> จะถูก<b>แทนที่ทั้งหมด</b>ด้วยข้อมูลในไฟล์ (ย้อนกลับไม่ได้)</p>
+      ${skip.length ? `<p class="hint">ข้าม ${skip.map(x => roomLabel(x.g, x.r)).join(', ')} (โรงเรียนนี้ไม่มีสิทธิ์ชั้นนี้)</p>` : ''}
       <p class="hint">แนะนำ: กด “สำรองข้อมูล” เก็บข้อมูลปัจจุบันไว้ก่อน</p>`,
       [{ label: 'ยกเลิก', value: false }, { label: 'แทนที่ด้วยไฟล์สำรอง', value: true, primary: true }]);
     if (!yes) return;
     clearTimeout(S.saveTimer); S.dirty = false;
     try {
-      for (const g of gs) {
-        const cur = await backend.load(S.code, g);
-        const doc = { ...file.grades[g], grade: g, savedAt: new Date().toISOString() };
-        const res = await backend.save(S.code, g, doc, (cur && cur.version) || 0, true);
+      for (const { g, r, doc: d } of list) {
+        const cur = await backend.load(S.code, g, r);
+        const doc = { ...d, grade: g, room: r, savedAt: new Date().toISOString() }; delete doc.logo;
+        const res = await backend.save(S.code, g, r, doc, (cur && cur.version) || 0, true);
         if (!res || res.ok === false) throw new Error((res && res.error) || 'บันทึกไม่สำเร็จ');
-        if (g === S.grade) LS.del(draftKey());
+        if (!S.rooms[g].includes(r)) S.rooms[g] = [...S.rooms[g], r].sort((a, b) => a - b);
+        LS.del('pp_draft_' + P_hash(S.code) + '_' + g + (r > 1 ? '_' + r : ''));
       }
+      const logo = file.logo || (list.find(x => x.doc.logo) || {}).doc?.logo;
+      if (logo && !S.school.logo) { await backend.setLogo(S.code, logo); S.school.logo = logo; }
     } catch (e) { toast('นำเข้าไม่สำเร็จ: ' + (e.message || e), 'warn'); return; }
-    toast('นำเข้าข้อมูลสำรองแล้ว (' + gs.map(g => 'ป.' + g).join(', ') + ')', 'ok');
-    openGrade(gs.includes(S.grade) ? S.grade : gs[0]);
+    toast('นำเข้าข้อมูลสำรองแล้ว (' + list.length + ' ห้อง)', 'ok');
+    const keep = list.some(x => x.g === S.grade && x.r === S.room);
+    openGrade(keep ? S.grade : list[0].g, keep ? S.room : list[0].r);
   }
 
   // ---------------------------------------------------------------- print
@@ -545,7 +630,7 @@
   }
   document.addEventListener('DOMContentLoaded', boot);
   window.PPApp = {
-    S, ctx, toast, modal, applyValue, validate, markDirty, save, batch, printSheets, printOne, printAll, printBlock,
+    S, ctx, toast, roomLabel, modal, applyValue, validate, markDirty, save, batch, printSheets, printOne, printAll, printBlock,
     openDoc, closeDoc, refreshDoc, printSet, printScores, exportBackup, pickBackup, openCover, pickLogo: () => $('#logo-file').click(), removeLogo, setStatus, flushSave,
   };
 })();

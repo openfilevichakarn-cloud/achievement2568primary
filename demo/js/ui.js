@@ -174,7 +174,7 @@
     const p = progress(), S = A().S;
     const step = (n, title, desc, done, to, pct) => `<button class="step ${done ? 'done' : ''}" data-act="goto" data-to="${to}"><span class="no">${done ? '✓' : n}</span><span style="flex:1;min-width:0"><b>${esc(title)}</b><small>${esc(desc)}</small>${pct !== undefined ? `<div class="prog"><i style="width:${Math.round(pct * 100)}%"></i></div>` : ''}</span><span class="go">›</span></button>`;
     return `
-    <div class="card hello">${S.view.logo ? `<img class="logo" src="${S.view.logo}" alt="ตราโรงเรียน">` : ''}<div><h2>${esc(S.school.name)} 🔒</h2><p>ชั้นประถมศึกษาปีที่ ${S.grade} · ปีการศึกษา ${esc(txt(L.info, 9, 2))}</p></div></div>
+    <div class="card hello">${S.view.logo ? `<img class="logo" src="${S.view.logo}" alt="ตราโรงเรียน">` : ''}<div><h2>${esc(S.school.name)} 🔒</h2><p>ชั้นประถมศึกษาปีที่ ${S.grade}/${S.room} · ปีการศึกษา ${esc(txt(L.info, 9, 2))}</p></div></div>
     <div class="stat"><div><b>${p.stu.length}</b><span>นักเรียน</span></div><div><b>${p.subs.length}</b><span>รายวิชา</span></div><div><b>${Math.round(p.sp * 100)}%</b><span>คะแนนกรอกแล้ว</span></div></div>
     <div class="steps">
       ${step(1, 'ตั้งค่าโรงเรียน', p.infoDone ? 'กรอกชื่อครูและผู้อำนวยการแล้ว' : 'กรอกชื่อครูประจำชั้น ผู้อำนวยการ และตราโรงเรียน', p.infoDone, 'data:school')}
@@ -774,7 +774,7 @@
   }
   // หน้า "ข้อมูลนักเรียน" ของเล่มรายวิชา (สร้างจากรายชื่อนักเรียน) — คืน { html, zoom }
   function stuInfoPage(s) {
-    const stu = students(), sr = s.sr, g = A().S.grade;
+    const stu = students(), sr = s.sr, g = A().S.grade, cls = txt(L.sub, 2, 3).replace(/^ประถมศึกษาปีที่\s*/, '') || g;
     const teacher = txt(L.sub, sr, 6).trim() || txt(L.info, 5, 2).trim();
     const code = txt(L.sub, sr, 2).trim(), year = txt(L.info, 9, 2), male = stu.filter(x => x.sex === 'ชาย').length, female = stu.filter(x => x.sex === 'หญิง').length;
     const clean = (v) => isPh(v) ? '' : v;
@@ -782,7 +782,7 @@
     const html = `<div class="pp-stu">
       <h1>ข้อมูลนักเรียน</h1>
       <p class="pp-sub">รายวิชา <b>${esc(oneLine(s.name))}</b>${code ? ` &nbsp; รหัสวิชา <b>${esc(code)}</b>` : ''}</p>
-      <p class="pp-sub">ชั้นประถมศึกษาปีที่ ${g} &nbsp; ปีการศึกษา ${esc(year)} &nbsp; ${esc(A().S.school.name)}</p>
+      <p class="pp-sub">ชั้นประถมศึกษาปีที่ ${esc(cls)} &nbsp; ปีการศึกษา ${esc(year)} &nbsp; ${esc(A().S.school.name)}</p>
       <p class="pp-sub">ครูผู้สอน ${esc(clean(teacher))}</p>
       <table><thead><tr><th style="width:9%">เลขที่</th><th>ชื่อ - สกุล</th><th style="width:11%">เพศ</th><th style="width:17%">การเข้าชั้นเรียน (%)</th><th style="width:17%">หมายเหตุ</th></tr></thead>
       <tbody>${rows || '<tr><td colspan="5">ยังไม่มีรายชื่อนักเรียน</td></tr>'}</tbody></table>
@@ -813,14 +813,14 @@
   // คอลัมน์ในไฟล์เรียงตรงกับช่องกรอกในตารางของหน้านั้นทุกประการ — คัดลอกทั้งก้อนแล้ววางที่ช่องแรกได้ทันที
   const xlBtn = (k) => `<button class="btn" data-act="xlform" data-k="${k}" title="ดาวน์โหลดแบบฟอร์ม Excel ที่มีคอลัมน์ตรงกับตารางนี้ กรอกเสร็จแล้วคัดลอกมาวาง">⬇ แบบฟอร์ม Excel</button>`;
   function xlForm(k) {
-    const S = A().S, g = S.grade, stu = students(), blank = (v) => v === null || v === undefined || isPh(v) ? '' : v;
+    const S = A().S, g = S.grade + (S.room > 1 || (S.rooms[S.grade] || []).length > 1 ? '-' + S.room : ''), stu = students(), blank = (v) => v === null || v === undefined || isPh(v) ? '' : v;
     const howTo = (first) => `วิธีใช้: กรอกเฉพาะช่องสีขาว แล้วเลือกช่องสีขาวทั้งหมดตั้งแต่แถวแรก (คลิกช่องแรก แล้วกด Shift ค้างคลิกช่องสุดท้าย) กด Ctrl+C → กลับมาที่โปรแกรม คลิก${first} แล้วกด Ctrl+V · ห้ามสลับลำดับแถวหรือคอลัมน์`;
     let file, o;
     if (k === 'stu') {
       const rows = [];
       for (let r = L.stuFirst; r <= L.stuLast; r++) rows.push([get(L.stu, r, 1) ?? r - 2, blank(get(L.stu, r, 2)), blank(get(L.stu, r, 3)), blank(get(L.stu, r, 4))]);
       file = `form-students-p${g}.xlsx`;
-      o = { name: 'นักเรียน', title: `แบบฟอร์มรายชื่อนักเรียน ชั้นประถมศึกษาปีที่ ${g}`, cols: [6, 36, 14, 14], ref: 1,
+      o = { name: 'นักเรียน', title: `แบบฟอร์มรายชื่อนักเรียน ชั้น ${A().roomLabel(S.grade, S.room)}`, cols: [6, 36, 14, 14], ref: 1,
         head: ['ที่', 'ชื่อ - สกุล\n(เช่น เด็กชายสมชาย ใจดี)', 'เพศ\n(ชาย / หญิง)', 'เข้าเรียน\n(ร้อยละ 0-100)'], rows,
         valid: [{ col: 3, type: 'list', list: ['ชาย', 'หญิง'], msg: 'เลือก ชาย หรือ หญิง' }, { col: 4, type: 'decimal', min: 0, max: 100, msg: 'กรอกตัวเลข 0-100' }],
         note: howTo('ช่อง “ชื่อ - สกุล” ของนักเรียนคนที่ 1') };
@@ -829,7 +829,7 @@
       const cur = curSubject(), sc = L.score(cur.slot), T = U.scoreTerm, inds = activeInds(sc, T), cols = [...inds, SC[T].exam];
       const mx = (c) => num(sc, 4, c) ?? 0;
       file = `form-scores-p${g}-subject${cur.slot}-term${T}.xlsx`;
-      o = { name: 'คะแนน เทอม ' + T, title: `แบบฟอร์มคะแนน ${oneLine(cur.name)} · เทอม ${T} · ชั้น ป.${g}`, ref: 2,
+      o = { name: 'คะแนน เทอม ' + T, title: `แบบฟอร์มคะแนน ${oneLine(cur.name)} · เทอม ${T} · ชั้น ${A().roomLabel(S.grade, S.room)}`, ref: 2,
         cols: [6, 32, ...cols.map(() => 13), 22],
         head: ['ที่', 'ชื่อ - สกุล', ...inds.map((c, i) => `${indLabel(sc, c, i)}\n(เต็ม ${mx(c)})`), `คะแนนสอบ\n(เต็ม ${mx(SC[T].exam)})`, 'หมายเหตุ'],
         rows: stu.map(st => { const r = stuScoreRow(st.r); return [st.no, st.name, ...cols.map(c => blank(get(sc, r, c))), blank(get(sc, r, SC.note))]; }),
@@ -839,7 +839,7 @@
       if (!stu.length) { A().toast('เพิ่มรายชื่อนักเรียนก่อน', 'warn'); return; }
       const kind = U.kind, t = U.aTerm, sh = asSheet(kind, t), heads = activeItems(kind), label = kind === 'trait' ? 'คุณลักษณะอันพึงประสงค์' : 'กิจกรรมพัฒนาผู้เรียน';
       file = `form-${kind === 'trait' ? 'trait' : 'activity'}-p${g}-term${t}.xlsx`;
-      o = { name: (kind === 'trait' ? 'คุณลักษณะ' : 'กิจกรรม') + ' เทอม ' + t, title: `แบบฟอร์มประเมิน${label} · เทอม ${t} · ชั้น ป.${g}`, ref: 2,
+      o = { name: (kind === 'trait' ? 'คุณลักษณะ' : 'กิจกรรม') + ' เทอม ' + t, title: `แบบฟอร์มประเมิน${label} · เทอม ${t} · ชั้น ${A().roomLabel(S.grade, S.room)}`, ref: 2,
         cols: [6, 32, ...heads.map(() => 15)], head: ['ที่', 'ชื่อ - สกุล', ...heads.map(c => oneLine(txt(asSheet(kind, 1), 3, c)))],
         rows: stu.map(st => [st.no, st.name, ...heads.map(c => blank(get(sh, stuTraitRow(st.r), c)))]),
         valid: heads.map((c, i) => ({ col: 3 + i, type: 'list', list: ['ผ่าน', 'ไม่ผ่าน'], msg: 'เลือก ผ่าน หรือ ไม่ผ่าน' })),
@@ -854,7 +854,7 @@
     ['start', 'เริ่มต้นใช้งาน', null, `
       <ol><li>เปิดเว็บด้วย <b>Google Chrome</b> หรือ <b>Microsoft Edge</b> (ใช้ได้ทั้งคอมพิวเตอร์ แท็บเล็ต และมือถือ)</li>
       <li>กรอก <b>รหัสสิทธิ์โรงเรียน</b> ที่ได้รับหลังชำระค่าโปรแกรม แล้วกด “เข้าสู่ระบบ” — ติ๊ก “จำรหัสในเครื่องนี้” ถ้าเป็นเครื่องส่วนตัว</li>
-      <li>ถ้าโรงเรียนซื้อหลายชั้น เลือกชั้นได้ที่ช่อง <b>ป.?</b> ด้านบน ข้อมูลแต่ละชั้นแยกกัน</li>
+      <li>เลือกชั้น/ห้องได้ที่ช่อง <b>ป.?/?</b> ด้านบน ข้อมูลแต่ละห้องแยกกัน — ถ้าชั้นเดียวมีหลายห้อง เลือก <b>⚙ จัดการห้องเรียน…</b> ในช่องเดียวกันเพื่อ <b>เพิ่มห้อง</b> (ชั้นละไม่เกิน 10 ห้อง) หรือลบห้อง</li>
       <li>ทำตามขั้นตอนในหน้า <b>หน้าแรก</b> ทีละข้อ (ข้อที่ทำเสร็จจะขึ้นเครื่องหมาย ✓)</li></ol>
       <p class="hint">ชื่อโรงเรียนถูกล็อกตามรหัสสิทธิ์ แก้เองไม่ได้ ถ้าสะกดผิดให้แจ้งผู้ดูแลระบบ · ใช้รหัสเดียวกันได้หลายเครื่อง แต่ไม่ควรแก้ข้อมูลชั้นเดียวกันพร้อมกัน</p>`],
     ['school', 'ตั้งค่าข้อมูลโรงเรียน', 'data:school', `
@@ -921,6 +921,7 @@
         <dt>กรอกคะแนนไม่ได้ ช่องเป็นสีเทา</dt><dd>ยังไม่ได้ตั้งคะแนนเต็มของตัวชี้วัด/คะแนนสอบนั้น ตั้งคะแนนเต็มด้านบนตารางก่อน</dd>
         <dt>ผลความสามารถใน ปพ.6 ว่าง</dt><dd>ตรวจว่าทุกวิชาเลือก “อยู่ในความสามารถข้อ” แล้ว (เมนู ข้อมูล → รายวิชา) และกรอกคะแนนครบ</dd>
         <dt>พิมพ์แล้วไม่มีสีพื้นตาราง / ตารางเล็กหรือเกินหน้า</dt><dd>ติ๊ก “กราฟิกพื้นหลัง” และตั้งสเกลเป็นค่าเริ่มต้น ขนาดกระดาษ A4</dd>
+        <dt>มีหลายห้อง เช่น ป.1/1 และ ป.1/2</dt><dd>เพิ่มห้องที่ช่องเลือกชั้นด้านบน → ⚙ จัดการห้องเรียน… ทุกห้องใช้รหัสโรงเรียนเดียวกัน ชื่อชั้นในเอกสารจะแสดงห้องให้อัตโนมัติ (แก้เองได้ที่ ข้อมูล → โรงเรียน → ชั้น) ตราโรงเรียนใส่ครั้งเดียวใช้ได้ทุกห้อง</dd>
         <dt>เห็นหน้าเว็บแบบเก่าหลังมีการปรับปรุง</dt><dd>กด <kbd>Ctrl</kbd>+<kbd>F5</kbd> (มือถือ: ปิดแล้วเปิดเบราว์เซอร์ใหม่)</dd>
       </dl>`],
   ];

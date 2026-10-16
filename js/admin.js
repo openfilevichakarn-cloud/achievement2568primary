@@ -116,7 +116,7 @@
         <td class="stk"><b>${esc(s.name)}</b></td>
         <td>${(s.grades || []).map(g => `<span class="chip">ป.${g}</span>`).join(' ')}</td>
         <td>${s.active ? '<span class="pass ok">ใช้งาน</span>' : '<span class="pass no">ระงับ</span>'}</td>
-        <td class="hint">${last ? `${fmtDate(last.updated_at)}<br><small>ป.${last.grade} · ครั้งที่ ${last.version}</small>` : 'ยังไม่เคยบันทึก'}</td>
+        <td class="hint">${last ? `${fmtDate(last.updated_at)}<br><small>ป.${last.grade}${last.room ? '/' + last.room : ''} · ครั้งที่ ${last.version} · ${(s.saves || []).length} ห้อง</small>` : 'ยังไม่เคยบันทึก'}</td>
         <td class="hint a-note">${esc(s.note || '')}</td>
         <td class="hint">${fmtDate(s.created_at)}</td>
         <td><div class="row a-act"><button class="btn sm" data-a="edit">แก้ไข</button><button class="btn sm" data-a="reset">รีเซ็ตรหัส</button>
