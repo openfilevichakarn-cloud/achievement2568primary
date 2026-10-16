@@ -18,6 +18,11 @@ for d in ('js', 'css', 'fonts', 'img', 'data'):
     shutil.rmtree(os.path.join(OUT, d), ignore_errors=True)
     shutil.copytree(os.path.join(ROOT, d), os.path.join(OUT, d))
 os.remove(os.path.join(OUT, 'js', 'admin.js'))
+# ลิงก์ไปหน้าของเว็บจริง (เว็บตัวอย่างอยู่ในโฟลเดอร์ demo/)
+uj = os.path.join(OUT, 'js', 'ui.js'); t = open(uj, encoding='utf-8').read().replace('href="register.html#pdpa"', 'href="../register.html#pdpa"')
+open(uj, 'w', encoding='utf-8').write(t)
+for f in ('register.js',): os.path.exists(os.path.join(OUT, 'js', f)) and os.remove(os.path.join(OUT, 'js', f))
+rc = os.path.join(OUT, 'css', 'register.css'); os.path.exists(rc) and os.remove(rc)
 os.remove(os.path.join(OUT, 'css', 'admin.css'))
 
 src = open(os.path.join(ROOT, 'js', 'config.js'), encoding='utf-8').read()
