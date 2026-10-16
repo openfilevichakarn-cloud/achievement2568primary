@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
     }
     const fin = await rpc('order_finish', { p_id: st.id, p_ok: ok, p_trans_ref: transRef, p_slip: slipInfo, p_reason: reason });
     // ปัญหาฝั่งระบบ (เช่น โควตาหมด): ไม่บอกรายละเอียดภายในกับลูกค้า
-    if (system && fin.status === 'review') fin.reason = 'ระบบตรวจสลิปอัตโนมัติไม่พร้อมใช้งานชั่วคราว เจ้าหน้าที่จะตรวจสลิปและส่งรหัสให้';
+    if (system && fin.status === 'review') fin.reason = 'ระบบตรวจสลิปอัตโนมัติไม่พร้อมใช้งานชั่วคราว';
     return json({ ...fin, ref: st.ref, amount: st.amount });
   } catch (e) {
     console.error(e);
@@ -138,7 +138,7 @@ Deno.serve(async (req) => {
     if (st && st.id) {
       try {
         await rpc('order_finish', { p_id: st.id, p_ok: false, p_trans_ref: null, p_slip: { error: String(e) }, p_reason: '[ระบบ] ฟังก์ชันตรวจสลิปขัดข้อง — ตรวจคำสั่งซื้อนี้เอง' });
-        return json({ ok: true, status: 'review', ref: st.ref, amount: st.amount, reason: 'ระบบตรวจสลิปอัตโนมัติไม่พร้อมใช้งานชั่วคราว เจ้าหน้าที่จะตรวจสลิปและส่งรหัสให้' });
+        return json({ ok: true, status: 'review', ref: st.ref, amount: st.amount, reason: 'ระบบตรวจสลิปอัตโนมัติไม่พร้อมใช้งานชั่วคราว' });
       } catch (e2) { console.error(e2); }
     }
     return json({ ok: false, error: 'ระบบขัดข้องชั่วคราว กรุณาลองใหม่ หรือติดต่อทางเพจ' }, 500);

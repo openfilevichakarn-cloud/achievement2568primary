@@ -11,6 +11,7 @@ window.PP_CONFIG = {
   SALES: {
     DEMO_URL: '',            // ลิงก์เว็บตัวอย่าง (โฟลเดอร์ demo/) เช่น 'https://xxx.github.io/achievement2568primary/demo/' — เว้นว่าง = ใช้ 'demo/'
     FACEBOOK: 'https://www.facebook.com/filevichakan/',
+    MESSENGER: 'https://www.facebook.com/messages/t/filevichakan/',   // แชทเพจ — ลูกค้าติดต่อแอดมินเพื่อรับรหัสเมื่อสลิปรอตรวจ
     LINE_ID: '',             // เช่น '@filevichakan' — เว้นว่าง = ไม่แสดง
     PHONE: '',               // เช่น '08x-xxx-xxxx' — เว้นว่าง = ไม่แสดง
     // แพ็กเกจราคา — เว้นว่าง [] = แสดง "ติดต่อสอบถามราคา"
