@@ -54,13 +54,18 @@ function accountMatches(masked: string, target: string): boolean {
   return t.includes(digits);
 }
 
-type Slip = { amount: number; date: string; transRef: string; account: string; name: string; bank: string; raw: unknown };
+// matched = บัญชีที่ EasySlip จับคู่ได้ (v2 matchAccount: บัญชีที่ลงทะเบียนไว้ในหน้า EasySlip) — ไม่มี = ตรวจเอง
+type Slip = { amount: number; date: string; transRef: string; account: string; name: string; bank: string; matched: string; raw: unknown };
 
 // ตรวจผู้รับเงิน: ถ้าสลิปมีเลขบัญชี (เห็นอย่างน้อย 3 หลัก) ตรวจเลขบัญชี — ถ้าไม่มี (เช่น ผล API v2 บางรูปแบบ) ตรวจชื่อผู้รับ + ธนาคารแทน
 const BANK_CODE: Record<string, string> = { 'กรุงไทย': 'KTB', 'กสิกร': 'KBANK', 'ไทยพาณิชย์': 'SCB', 'กรุงเทพ': 'BBL', 'กรุงศรี': 'BAY', 'ทหารไทยธนชาต': 'TTB', 'ออมสิน': 'GSB', 'ธ.ก.ส.': 'BAAC', 'ยูโอบี': 'UOB', 'ซีไอเอ็มบี': 'CIMB', 'เกียรตินาคิน': 'KKP', 'แลนด์': 'LHB' };
 const TITLES = /^(นาย|นางสาว|นาง|น\.ส\.|ด\.ช\.|ด\.ญ\.|mr\.?|mrs\.?|ms\.?|miss)\s*/i;
 function firstName(n: string): string { return String(n || '').trim().replace(TITLES, '').trim().split(/\s+/)[0] || ''; }
 function receiverMatches(slip: Slip, S: Record<string, any>): { ok: boolean; how: string } {
+  if (slip.matched) {
+    const a = slip.matched.replace(/[^0-9]/g, ''), b = String(S.account_no || '').replace(/[^0-9]/g, '');
+    if (a && b) return { ok: a === b, how: `EasySlip จับคู่ผู้รับได้กับบัญชี ${slip.matched} ซึ่งไม่ใช่บัญชีรับเงินที่ตั้งไว้` };
+  }
   const visible = String(slip.account || '').replace(/[^0-9]/g, '').length;
   if (visible >= 3) return { ok: accountMatches(slip.account, S.account_no), how: `บัญชีผู้รับในสลิป (${slip.account}) ไม่ใช่บัญชีของร้าน` };
   const want = firstName(S.account_name), got = String(slip.name || '').replace(TITLES, '').trim();
@@ -81,43 +86,64 @@ const SYS = {
 // ดึงค่าจากผลตรวจ (รองรับชื่อฟิลด์ทั้ง v1 / v2)
 function pickSlip(d: any): Slip {
   const recv = d?.receiver || {}, acc = recv.account || {};
-  const amount = Number(d?.amount?.amount ?? d?.amount?.value ?? d?.amount);
+  const amount = Number(d?.amount?.amount ?? d?.amount?.value ?? d?.amountInSlip ?? d?.amount);
+  const m = d?.matchedAccount || d?.matched_account;
   const date = String(d?.date || d?.transDate && `${d.transDate}T${d.transTime || '00:00:00'}+07:00` || d?.transactionDate || d?.dateTime || '');
   const account = String(acc.bank?.account || acc.proxy?.account || acc.value || acc.number || recv.bank?.account || recv.accountNumber || '');
   return { amount, date, transRef: String(d?.transRef || d?.transactionId || d?.ref || ''), account,
     name: String(acc.name?.th || acc.name?.en || recv.name?.th || recv.name || recv.displayName || ''),
-    bank: String(recv.bank?.short || recv.bank?.code || ''), raw: d };
+    bank: String(recv.bank?.short || recv.bank?.shortCode || recv.bank?.code || ''),
+    matched: m && typeof m === 'object' ? String(m.bankNumber || m.accountNumber || m.account || '') : '', raw: d };
 }
+// รหัส error ของ API v2 (เอกสาร EasySlip: ภาพรวม API v2 → รหัส Error)
+const V2_ERR: Record<string, 'quota' | 'unauthorized' | 'account' | 'slip' | 'down'> = {
+  QUOTA_EXCEEDED: 'quota', MISSING_API_KEY: 'unauthorized', INVALID_API_KEY: 'unauthorized',
+  BRANCH_INACTIVE: 'account', SERVICE_BANNED: 'account', USER_BANNED: 'account', IP_NOT_ALLOWED: 'account',
+  SLIP_NOT_FOUND: 'slip', VALIDATION_ERROR: 'slip', API_SERVER_ERROR: 'down',
+};
 function classify(status: number, msg: string, raw: unknown): Fail {
+  const k = V2_ERR[String(msg).split(/\s/)[0]];
+  if (k === 'quota') return { ok: false, kind: 'system', reason: SYS.quota, raw };
+  if (k === 'unauthorized') return { ok: false, kind: 'system', reason: SYS.unauthorized, raw };
+  if (k === 'account') return { ok: false, kind: 'system', reason: `[ระบบ] บัญชี EasySlip ใช้งานไม่ได้ (${msg}) — ตรวจหน้า EasySlip (Branch ถูกปิด / ถูกระงับ / IP Whitelist) แล้วตรวจคำสั่งซื้อนี้เอง`, raw };
+  if (k === 'down') return { ok: false, kind: 'system', reason: SYS.down + ` (${msg})`, raw };
+  if (k === 'slip') return { ok: false, kind: 'slip', reason: 'อ่าน QR บนสลิปไม่ได้ หรือไม่พบรายการโอนนี้ (' + msg + ')', raw };
   if (/quota|limit|exceed|credit|insufficient/i.test(msg) || status === 429 || status === 402) return { ok: false, kind: 'system', reason: SYS.quota, raw };
   if (status === 401 || /unauthori[sz]ed|invalid.?(api.?)?key|token|forbidden_key/i.test(msg)) return { ok: false, kind: 'system', reason: SYS.unauthorized, raw };
   if (/slip_not_found|not_found|qrcode|invalid_payload|invalid_image|payload/i.test(msg) && status < 500) return { ok: false, kind: 'slip', reason: 'อ่าน QR บนสลิปไม่ได้ หรือไม่พบรายการโอนนี้ (' + msg + ')', raw };
   return { ok: false, kind: 'system', reason: `[ระบบ] บริการตรวจสลิปตอบผิดพลาด (${msg}) — ตรวจคำสั่งซื้อนี้เอง`, raw };
 }
 // EasySlip API v2: POST https://api.easyslip.com/v2/verify/bank  { payload: "<ข้อความใน QR>" } -> { success, data } / { success:false, error:{ code, message } }
-async function verifyV2(qr: string): Promise<{ ok: true; slip: Slip } | Fail> {
+//   + matchAccount: true  -> ให้ EasySlip จับคู่ผู้รับกับบัญชีที่ลงทะเบียนไว้ (ได้ data.matchedAccount.bankNumber)
+//   + matchAmount: <ยอด>  -> ได้ amountInSlip / isAmountMatched (เราตรวจยอดเองซ้ำอีกชั้น)
+async function verifyV2(qr: string, amount: number): Promise<{ ok: true; slip: Slip } | Fail> {
   if (!qr) return { ok: false, kind: 'slip', reason: 'อ่าน QR บนสลิปไม่ได้ (รูปไม่ชัด / ถูกครอป / ถ่ายจากหน้าจอ)' };
-  let r: Response;
-  try {
-    r = await fetch('https://api.easyslip.com/v2/verify/bank', {
+  const call = async (extra: Record<string, unknown>) => {
+    const r = await fetch('https://api.easyslip.com/v2/verify/bank', {
       method: 'POST', headers: { Authorization: `Bearer ${SLIP_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ payload: qr }), signal: AbortSignal.timeout(20_000),
+      body: JSON.stringify({ payload: qr, ...extra }), signal: AbortSignal.timeout(20_000),
     });
+    return { r, j: await r.json().catch(() => null) };
+  };
+  let r: Response, j: any;
+  try {
+    ({ r, j } = await call(amount > 0 ? { matchAccount: true, matchAmount: amount } : { matchAccount: true }));
+    // ถ้าตัวเลือกจับคู่ทำให้คำขอไม่ผ่าน (เช่น ยังไม่ได้ลงทะเบียนบัญชีใน EasySlip) ลองใหม่แบบส่ง payload อย่างเดียว
+    if (r.status === 400 && String(j?.error?.code || '') === 'VALIDATION_ERROR') ({ r, j } = await call({}));
   } catch (e) { return { ok: false, kind: 'system', reason: SYS.down, raw: { error: String(e) } }; }
-  const j = await r.json().catch(() => null);
   if (!r.ok || !j || j.success === false || !j.data) {
     const code = String(j?.error?.code || j?.code || j?.message || `HTTP ${r.status}`);
     return classify(r.status, code + (j?.error?.message ? ' ' + j.error.message : ''), { status: r.status, body: j, api: 'v2' });
   }
   return { ok: true, slip: pickSlip(j.data) };
 }
-async function verifySlip(image: string, qr = ''): Promise<{ ok: true; slip: Slip } | Fail> {
+async function verifySlip(image: string, qr = '', amount = 0): Promise<{ ok: true; slip: Slip } | Fail> {
   if (SIMULATE === 'quota') return { ok: false, kind: 'system', reason: SYS.quota + ' (จำลอง)', raw: { simulated: 'quota', status: 403, message: 'quota_exceeded' } };
   if (SIMULATE === 'unauthorized') return { ok: false, kind: 'system', reason: SYS.unauthorized + ' (จำลอง)', raw: { simulated: 'unauthorized', status: 401 } };
   if (SIMULATE === 'down') return { ok: false, kind: 'system', reason: SYS.down + ' (จำลอง)', raw: { simulated: 'down' } };
   if (SIMULATE === 'invalid') return { ok: false, kind: 'slip', reason: 'อ่าน QR บนสลิปไม่ได้ หรือไม่พบรายการโอนนี้ (จำลอง)', raw: { simulated: 'invalid' } };
   if (!SLIP_KEY) return { ok: false, kind: 'system', reason: SYS.nokey };
-  if (VERSION === 'v2') return verifyV2(qr);
+  if (VERSION === 'v2') return verifyV2(qr, amount);
   const fd = new FormData();
   fd.append('file', dataUrlToBlob(image), 'slip.jpg');
   let r: Response;
@@ -150,12 +176,12 @@ Deno.serve(async (req) => {
     if (!st.ok) return json(st);
     const S = st.settings || {}, tol = Number(S.time_tolerance_min || 15);
 
-    const v = await verifySlip(image, String(order.slip_qr || '').slice(0, 1000));
+    const v = await verifySlip(image, String(order.slip_qr || '').slice(0, 1000), Number(st.amount));
     let ok = false, reason: string | null = null, transRef: string | null = null, slipInfo: unknown = null, system = false;
     if (!v.ok) { reason = v.reason; system = v.kind === 'system'; slipInfo = { error: v.reason, kind: v.kind, raw: v.raw ?? null }; }
     else {
       const s = v.slip; transRef = s.transRef || null;
-      slipInfo = { amount: s.amount, date: s.date, account: s.account, name: s.name, bank: s.bank, transRef: s.transRef, raw: s.raw };
+      slipInfo = { amount: s.amount, date: s.date, account: s.account, name: s.name, bank: s.bank, matched: s.matched || null, transRef: s.transRef, raw: s.raw };
       const slipT = Date.parse(s.date), userT = Date.parse(String(st.transfer_at)), now = Date.now();
       const fails: string[] = [];
       if (!(Math.abs(s.amount - Number(st.amount)) < 0.005)) fails.push(`ยอดในสลิป ${s.amount} บาท ไม่ตรงกับยอดที่ต้องโอน ${st.amount} บาท`);
