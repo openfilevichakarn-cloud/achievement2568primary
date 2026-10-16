@@ -86,7 +86,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ' + roomLabel(g, room) + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261016x');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261016y');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -452,6 +452,27 @@
   async function flushSave() { clearTimeout(S.saveTimer); if (S.dirty) await save(); }
 
   // ---------------------------------------------------------------- สำรองข้อมูล (ไฟล์ .json ทุกชั้นที่โรงเรียนมีสิทธิ์)
+  // ตั้งค่าเดียวกันให้ทุกชั้น/ทุกห้องของโรงเรียน (ยกเว้นห้องที่เปิดอยู่ ซึ่งตั้งไว้แล้ว)
+  // cells = { ชื่อชีท: { A1: ค่า | null } } — เขียนทับเฉพาะช่องเหล่านี้ ข้อมูลอื่นของแต่ละห้องคงเดิม
+  async function applyToSchool(cells) {
+    await flushSave();
+    const done = [], fail = [];
+    for (const g of S.school.grades) for (const r of S.rooms[g]) {
+      if (g === S.grade && r === S.room) continue;
+      try {
+        const cur = await backend.load(S.code, g, r);
+        const base = (cur && cur.data) || { v: 3, grade: g, room: r, cells: {} };
+        const doc = { ...base, grade: g, room: r, cells: { ...(base.cells || {}) }, savedAt: new Date().toISOString() };
+        for (const [sh, m] of Object.entries(cells)) doc.cells[sh] = { ...(doc.cells[sh] || {}), ...m };
+        const res = await backend.save(S.code, g, r, doc, (cur && cur.version) || 0, false);
+        if (!res || res.ok === false) throw new Error((res && res.error) || 'บันทึกไม่สำเร็จ');
+        done.push(roomLabel(g, r));
+      } catch (e) { fail.push(roomLabel(g, r)); }
+    }
+    return { done, fail };
+  }
+  function otherRoomCount() { return S.school.grades.reduce((n, g) => n + S.rooms[g].length, 0) - 1; }
+
   const BACKUP_TAG = 'pp56-backup';
   // ไฟล์รุ่น 2: rooms = { "ชั้น/ห้อง": ข้อมูล } + ตราโรงเรียน  (รุ่น 1: grades = { ชั้น: ข้อมูล } = ห้อง 1)
   async function exportBackup() {
@@ -781,6 +802,6 @@
   document.addEventListener('DOMContentLoaded', boot);
   window.PPApp = {
     S, ctx, toast, roomLabel, modal, applyValue, validate, markDirty, save, batch, printSheets, printOne, printAll, printBlock,
-    openDoc, closeDoc, refreshDoc, printSet, printScores, exportBackup, pickBackup, openCover, pickLogo: () => $('#logo-file').click(), removeLogo, setStatus, flushSave,
+    applyToSchool, otherRoomCount, openDoc, closeDoc, refreshDoc, printSet, printScores, exportBackup, pickBackup, openCover, pickLogo: () => $('#logo-file').click(), removeLogo, setStatus, flushSave,
   };
 })();

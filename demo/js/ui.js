@@ -561,7 +561,8 @@
     const sheet = asSheet(kind, t), kc = AS[kind].sum, heads = activeItems(kind);
     const names = `<div class="card soft"><div class="hint" style="margin-bottom:6px">ชื่อหัวข้อ${kind === 'trait' ? 'คุณลักษณะ' : 'กิจกรรม'} (ใช้ทั้งเทอม 1 และเทอม 2) · สูงสุด ${AS[kind].max} หัวข้อ</div>
       <div class="maxbox">${heads.map((c, i) => field('หัวข้อ ' + (i + 1), inputFor(asSheet(kind, 1), 3, c, { after: 'rerender' }), 'wname')).join('')}
-      <div class="row indbtn"><button class="btn sm" data-act="as-add"${heads.length >= AS[kind].max ? ' disabled' : ''}>＋ เพิ่มหัวข้อ</button><button class="btn sm" data-act="as-del"${heads.length <= 1 ? ' disabled' : ''}>－ ลดหัวข้อ</button></div></div></div>`;
+      <div class="row indbtn"><button class="btn sm" data-act="as-add"${heads.length >= AS[kind].max ? ' disabled' : ''}>＋ เพิ่มหัวข้อ</button><button class="btn sm" data-act="as-del"${heads.length <= 1 ? ' disabled' : ''}>－ ลดหัวข้อ</button>
+      <button class="btn sm" data-act="as-school"${A().otherRoomCount() < 1 ? ' disabled title="โรงเรียนมีห้องเดียว"' : ''} title="ตั้งชื่อหัวข้อแบบนี้ให้ทุกชั้นทุกห้องของโรงเรียน">🏫 ใช้หัวข้อนี้ทั้งโรงเรียน</button></div></div></div>`;
     const head = `<tr><th class="no">ที่</th><th class="stk">ชื่อ - สกุล</th>${heads.map(c => Y ? `<th style="cursor:default">${esc(oneLine(txt(sheet, 3, c)))}</th>` : `<th data-act="acol" data-c="${c}" title="แตะเพื่อตั้งทั้งห้องเป็น ผ่าน">${esc(oneLine(txt(sheet, 3, c)))}</th>`).join('')}<th class="ro" style="min-width:70px;cursor:default">สรุป</th></tr>`;
     const body = stu.map((st, i) => {
       const r = stuTraitRow(st.r);
@@ -585,6 +586,22 @@
     if (!ok) return;
     A().batch(() => { for (const t of [1, 2]) for (const st of stu) setv(asSheet(kind, t), stuTraitRow(st.r), c, null); setv(asSheet(kind, 1), 3, c, null); });
     refresh();
+  }
+  // ใช้ชื่อหัวข้อคุณลักษณะ / กิจกรรมชุดนี้กับทุกชั้นทุกห้อง (ผลประเมินที่กรอกไว้ไม่หาย)
+  async function asSchool() {
+    const kind = U.kind, sh = asSheet(kind, 1), label = kind === 'trait' ? 'คุณลักษณะอันพึงประสงค์' : 'กิจกรรมพัฒนาผู้เรียน';
+    const n = A().otherRoomCount(); if (n < 1) return;
+    const cols = range(3, AS[kind].max), heads = cols.filter(c => txt(sh, 3, c).trim());
+    const ok = await uiModal({ title: 'ใช้หัวข้อนี้ทั้งโรงเรียน', ok: 'ใช้กับทุกห้อง',
+      body: `<p>ตั้งหัวข้อ<b>${label}</b> ${heads.length} หัวข้อนี้ให้<b>ทุกชั้นทุกห้อง</b> (อีก ${n} ห้อง)</p>
+        <ol class="hint" style="margin:6px 0 8px 18px">${heads.map(c => `<li>${esc(oneLine(txt(sh, 3, c)))}</li>`).join('')}</ol>
+        <p class="hint">หัวข้อที่ห้องอื่นตั้งไว้จะถูกแทนที่ · ผลประเมินที่กรอกไว้แล้วไม่หาย</p>` });
+    if (!ok) return;
+    const m = {}; for (const c of cols) { const v = get(sh, 3, c); m[P.numToCol(c) + '3'] = v === null || v === undefined || String(v).trim() === '' ? null : v; }
+    A().toast('กำลังตั้งค่าให้ทุกห้อง...', 'ok');
+    const { done, fail } = await A().applyToSchool({ [sh]: m });
+    if (fail.length) A().toast(`ตั้งค่าแล้ว ${done.length} ห้อง · ไม่สำเร็จ: ${fail.join(', ')} (ลองใหม่อีกครั้ง)`, 'warn');
+    else A().toast(`ใช้หัวข้อ${label}นี้กับทุกห้องแล้ว (${done.length} ห้อง)`, 'ok');
   }
   const passChip = (v) => v ? `<span class="pass ${v === 'ผ่าน' ? 'ok' : 'no'}">${esc(v)}</span>` : '<span class="hint">–</span>';
   function assessSheet() { return U.kind === 'trait' ? L.trait(U.aTerm) : L.act(U.aTerm); }
@@ -928,6 +945,7 @@
       <li>กดปุ่ม <b>ตั้งทั้งหมดเป็น “ผ่าน”</b> แล้วค่อยแก้เฉพาะคนที่ไม่ผ่าน จะเร็วที่สุด · แตะหัวคอลัมน์ = ตั้งทั้งห้องเป็นผ่านเฉพาะหัวข้อนั้น</li>
 <li><b>แบบฟอร์ม Excel:</b> กดปุ่ม <b>⬇ แบบฟอร์ม Excel</b> ได้ไฟล์ที่คอลัมน์ตรงกับตารางในหน้านี้ (มีรายชื่อนักเรียนให้แล้ว) กรอกเฉพาะช่องสีขาว แล้วคัดลอกช่องสีขาวทั้งหมดมาวางที่ช่องแรกของตาราง</li>
       <li>เพิ่ม / ลด / แก้ชื่อหัวข้อได้ (คุณลักษณะสูงสุด 12 · กิจกรรมสูงสุด 8) ใช้ร่วมกันทั้ง 2 เทอม</li>
+      <li>ปุ่ม <b>🏫 ใช้หัวข้อนี้ทั้งโรงเรียน</b> — ตั้งชื่อหัวข้อชุดเดียวกันให้ทุกชั้นทุกห้อง (ผลประเมินที่กรอกไว้ไม่หาย)</li>
       <li>แท็บ <b>ทั้งปี</b> คำนวณเอง: ไม่ผ่านเทอมใดเทอมหนึ่ง = ไม่ผ่าน · ผ่านทั้ง 2 เทอม = ผ่าน</li></ul>`],
     ['reports', 'รายงาน ปพ.5 และ ปพ.6', 'report', `
       <ul><li><b>รายงาน ปพ.5:</b> ตารางสรุปผลทั้งห้อง จำนวนนักเรียนแต่ละระดับ ค่าเฉลี่ย และผลคุณลักษณะ/กิจกรรม เลือกดูเทอม 1 / เทอม 2 / ทั้งปี</li>
@@ -992,6 +1010,7 @@
       case 'ab-del': abDel(); break;
       case 'as-add': asAdd(); break;
       case 'as-del': asDel(); break;
+      case 'as-school': asSchool(); break;
       case 'ind-del': indDel(); break;
       case 'max-all': maxAll(); break;
       case 'sterm': U.scoreTerm = b.dataset.k === 'y' ? 'y' : +b.dataset.k; refresh(); break;
