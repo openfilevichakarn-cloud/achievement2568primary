@@ -86,7 +86,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ' + roomLabel(g, room) + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261016v');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261016w');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -587,11 +587,12 @@
     rows.forEach((tr, i) => { if (i >= sig && tr.textContent.trim()) tr.classList.add('sig'); });
     return (z._cmp = { box, tb, cols, rows, cw, rh, W, ovs, sig });
   }
-  function compactLayout(z, c, TW, rs) {
-    const s = TW / c.W;
+  function compactLayout(z, c, TW, rs, boost = 1) {
+    const s = TW / c.W, w0 = c.cw[0], f = boost === 1 ? 1 : Math.max(0.2, (c.W - w0 * boost) / (c.W - w0));
     z.style.zoom = 1; z.style.setProperty('--bw', '1px'); z.style.width = TW + 'px'; z.style.margin = '0 auto';
     c.box.style.width = TW + 'px'; c.tb.style.width = TW + 'px'; c.tb.classList.add('cmp');
-    c.cols.forEach((col, i) => { col.style.width = (c.cw[i] * s) + 'px'; });
+    // boost: ขยายคอลัมน์แรก (ข้อความยาว เช่น ความสามารถชั้นปี) คอลัมน์อื่นแคบลงตามสัดส่วน — ข้อความยาวตัดบรรทัดน้อยลง
+    c.cols.forEach((col, i) => { col.style.width = (c.cw[i] * s * (i === 0 ? boost : f)) + 'px'; });
     c.rows.forEach((tr, i) => { tr.style.height = c.rh[i] ? (c.rh[i] * rs) + 'px' : ''; });
     placeOverlays(c, rs);
   }
@@ -629,18 +630,27 @@
       if (c) {
         const rs = Math.min(1, availW / c.W);
         // ลองความกว้างตาราง: เต็มกระดาษก่อน ถ้าล้นแนวตั้งลองขยายให้กว้างขึ้น (แถวที่ตัดบรรทัดจะเตี้ยลง) เลือกแบบที่ตัวอักษรใหญ่สุด
-        let TW = availW, best = null;
-        for (let it = 0; it < 4; it++) {
-          compactLayout(z, c, TW, rs);
-          const r = z.getBoundingClientRect();
-          const k = Math.min(1, availW / r.width, availH / r.height);
-          if (!best || k > best.k + 0.005) best = { k, TW };
-          if (k > 0.995) break;
-          const next = Math.max(availW, r.width) / k;
-          if (next > TW * 1.6 || Math.abs(next - TW) < 4) break;
-          TW = next;
+        // ปพ.6: ลองขยายคอลัมน์ความสามารถชั้นปีหลายขนาด แล้วเลือกแบบที่ตัวอักษรใหญ่สุด
+        let best = null;
+        if (b.p6 && !c.nw) {   // คำสั้น (ระดับ / คะแนน / ผลประเมิน) ห้ามตัดกลางคำเมื่อคอลัมน์แคบลง
+          c.nw = true;
+          for (const td of c.tb.querySelectorAll('td')) { const t = td.textContent.trim(); if (t && t.length <= 14 && !/\s/.test(t)) td.style.whiteSpace = 'nowrap'; }
         }
-        if (best.TW !== TW) compactLayout(z, c, best.TW, rs);
+        for (const boost of b.p6 ? [1, 1.25, 1.5, 1.75, 2] : [1]) {
+          let TW = availW;
+          for (let it = 0; it < 4; it++) {
+            compactLayout(z, c, TW, rs, boost);
+            const r = z.getBoundingClientRect();
+            const k = Math.min(1, availW / r.width, availH / r.height);
+            if (!best || k > best.k + 0.005) best = { k, TW, boost };
+            if (k > 0.995) break;
+            const next = Math.max(availW, r.width) / k;
+            if (next > TW * 1.6 || Math.abs(next - TW) < 4) break;
+            TW = next;
+          }
+          if (best.k > 0.995) break;
+        }
+        compactLayout(z, c, best.TW, rs, best.boost);
         const k = best.k < 0.995 ? best.k * 0.99 : 1;
         if (b.stretch) stretchRows(z, c, availH / k * 0.995, rs);
         setZ(k); if (i === firstIdx) first = k;
