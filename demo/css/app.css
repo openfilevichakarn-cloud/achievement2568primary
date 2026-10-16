@@ -145,3 +145,4 @@ table.xl td.sx{font-family:'TH Sarabun New','Sarabun',sans-serif}
 /* โหมดมืด: หรี่ภาพพื้นหลังหน้าเข้าสู่ระบบ */
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .login{background-image:linear-gradient(rgba(10,14,22,.45),rgba(10,14,22,.45)),url('../img/login-bg.webp')}}
 :root[data-theme="dark"] .login{background-image:linear-gradient(rgba(10,14,22,.45),rgba(10,14,22,.45)),url('../img/login-bg.webp')}
+.reg-link{text-align:center;margin:.8rem 0 0;font-size:.95rem}

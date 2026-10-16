@@ -6,10 +6,10 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#1f5eff">
 <title>ผู้ดูแลระบบ — โปรแกรมแจ้งผลการศึกษา ปพ.5 และ ปพ.6</title>
-<script src="js/theme.js?v=20261016a"></script>
-<link rel="stylesheet" href="css/app.css?v=20261016a">
-<link rel="stylesheet" href="css/ui.css?v=20261016a">
-<link rel="stylesheet" href="css/admin.css?v=20261016a">
+<script src="js/theme.js?v=20261016b"></script>
+<link rel="stylesheet" href="css/app.css?v=20261016b">
+<link rel="stylesheet" href="css/ui.css?v=20261016b">
+<link rel="stylesheet" href="css/admin.css?v=20261016b">
 </head>
 <body class="admin">
 
@@ -32,7 +32,18 @@
     <div class="row"><a class="btn" href="./">เปิดโปรแกรม</a><button class="btn theme-btn" type="button" data-theme-toggle aria-label="สลับโหมดมืด/สว่าง">🌙</button><button id="a-logout" class="btn">ออก</button></div>
   </header>
   <div class="a-wrap">
-    <section class="card">
+    <section class="card" id="r-card">
+      <div class="row sp" style="margin-bottom:8px">
+        <h3 style="margin:0">คำขอสมัครใช้งาน <span id="r-count" class="hint"></span></h3>
+        <div class="row">
+          <div class="seg" id="r-filter"><button data-f="new" class="on">รอดำเนินการ</button><button data-f="all">ทั้งหมด</button></div>
+          <a class="btn" href="register.html" target="_blank" rel="noopener">เปิดหน้าสมัคร ↗</a>
+        </div>
+      </div>
+      <div class="tw a-tw"><table class="t a-table"><thead><tr><th>วันที่ / เลขที่</th><th class="stk">โรงเรียน</th><th>ผู้ติดต่อ</th><th>ชั้น / ห้อง</th><th>ข้อความ</th><th>สถานะ</th><th style="min-width:210px">จัดการ</th></tr></thead><tbody id="r-body"></tbody></table></div>
+    </section>
+
+    <section class="card" id="issue-card">
       <h3>ออกรหัสให้โรงเรียนใหม่</h3>
       <div class="a-issue">
         <label class="fld"><span>ชื่อโรงเรียน (1 บรรทัด = 1 โรงเรียน วางหลายโรงเรียนพร้อมกันได้)</span>
@@ -62,7 +73,7 @@
 <div id="modal" class="modal" hidden></div>
 <div id="toasts" class="toasts"></div>
 
-<script src="js/config.js?v=20261016a"></script>
-<script src="js/admin.js?v=20261016a"></script>
+<script src="js/config.js?v=20261016b"></script>
+<script src="js/admin.js?v=20261016b"></script>
 </body>
 </html>

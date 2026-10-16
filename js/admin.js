@@ -9,7 +9,7 @@
   const cfg = window.PP_CONFIG || {};
   const GRADES = [1, 2, 3, 4, 5, 6];
   const SS = { get: (k) => { try { return sessionStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { sessionStorage.setItem(k, v); } catch (e) { /* ignore */ } }, del: (k) => { try { sessionStorage.removeItem(k); } catch (e) { /* ignore */ } } };
-  const A = { pass: null, schools: [], filter: 'all', q: '' };
+  const A = { pass: null, schools: [], filter: 'all', q: '', regs: [], rfilter: 'new', fromReg: null };
 
   // ---------------------------------------------------------------- backend
   async function rpc(fn, body) {
@@ -38,6 +38,9 @@
       if (b.p_pass !== 'DEMO-ADMIN') return Promise.reject(Object.assign(new Error('รหัสผ่านผู้ดูแลไม่ถูกต้อง'), { denied: true }));
       const all = this.load(); const find = (id) => all.find(s => s.id === id);
       if (fn === 'admin_login') return { ok: true };
+      const REG = 'pp_demo_registrations', regs = () => { try { return JSON.parse(localStorage.getItem(REG) || '[]'); } catch (e) { return []; } };
+      if (fn === 'admin_registrations') return { ok: true, items: regs().map(r => ({ ...r, ref: r.id.replace(/-/g, '').slice(0, 6).toUpperCase() })).reverse() };
+      if (fn === 'admin_registration_set') { const x = regs(); const r = x.find(i => i.id === b.p_id); if (r) r.status = b.p_status; try { localStorage.setItem(REG, JSON.stringify(x)); } catch (e) { /* ignore */ } return { ok: true }; }
       if (fn === 'admin_list') return { ok: true, schools: all.slice().reverse() };
       if (fn === 'admin_issue') {
         const issued = b.p_names.map(n => String(n).trim()).filter(Boolean).map(name => { const s = { id: crypto.randomUUID(), name, grades: this.grades(b.p_grades), active: true, note: b.p_note || null, created_at: new Date().toISOString(), saves: [] }; all.push(s); return { id: s.id, name, code: this.code() }; });
@@ -123,7 +126,45 @@
           <button class="btn sm ${s.active ? 'danger' : ''}" data-a="toggle">${s.active ? 'ระงับ' : 'เปิดใช้'}</button></div></td></tr>`;
     }).join('') : `<tr><td colspan="7" class="hint" style="padding:18px">${A.schools.length ? 'ไม่พบโรงเรียนที่ค้นหา' : 'ยังไม่มีโรงเรียน — ออกรหัสได้จากกล่องด้านบน'}</td></tr>`;
   }
-  const load = guard(async () => { const r = await call('admin_list', {}); A.schools = r.schools || []; renderList(); });
+  const load = guard(async () => { const r = await call('admin_list', {}); A.schools = r.schools || []; renderList(); loadRegs(); });
+
+  // ---------------------------------------------------------------- คำขอสมัครใช้งาน (จาก register.html)
+  const ST = { new: '<span class="pass">รอดำเนินการ</span>', done: '<span class="pass ok">ออกรหัสแล้ว</span>', cancel: '<span class="pass no">ยกเลิก</span>' };
+  function renderRegs() {
+    const list = A.regs.filter(r => A.rfilter === 'all' || r.status === 'new');
+    const nNew = A.regs.filter(r => r.status === 'new').length;
+    $('#r-count').textContent = nNew ? `(รอ ${nNew})` : '';
+    $('#r-body').innerHTML = list.length ? list.map(r => `<tr data-id="${esc(r.id)}">
+      <td class="hint">${fmtDate(r.created_at)}<br><b>${esc(r.ref)}</b></td>
+      <td class="stk"><b>${esc(r.school)}</b>${r.area ? `<div class="hint">${esc(r.area)}</div>` : ''}</td>
+      <td>${esc(r.contact)}${r.position ? ` <span class="hint">(${esc(r.position)})</span>` : ''}<div class="hint">โทร ${esc(r.phone)}${r.line_id ? ' · LINE ' + esc(r.line_id) : ''}${r.email ? '<br>' + esc(r.email) : ''}</div></td>
+      <td>${(r.grades || []).map(g => `<span class="chip">ป.${g}</span>`).join(' ')}${r.rooms ? `<div class="hint">~${esc(r.rooms)} ห้อง</div>` : ''}</td>
+      <td class="hint a-note">${esc(r.note || '')}</td>
+      <td>${ST[r.status] || esc(r.status)}</td>
+      <td><div class="row a-act">${r.status === 'new' ? '<button class="btn sm primary" data-r="issue">ออกรหัส</button><button class="btn sm" data-r="cancel">ยกเลิก</button>' : '<button class="btn sm" data-r="new">กลับเป็นรอดำเนินการ</button>'}</div></td></tr>`).join('')
+      : `<tr><td colspan="7" class="hint" style="padding:18px">${A.regs.length ? 'ไม่มีคำขอที่รอดำเนินการ' : 'ยังไม่มีคำขอสมัคร — ส่งลิงก์หน้า register.html ให้โรงเรียนที่สนใจ'}</td></tr>`;
+  }
+  const loadRegs = async () => {
+    try { const r = await call('admin_registrations', {}); A.regs = r.items || []; renderRegs(); }
+    catch (e) { $('#r-body').innerHTML = `<tr><td colspan="7" class="hint" style="padding:18px">${/not find|does not exist|ยังไม่ได้อัปเดต/i.test(e.message) ? 'ยังไม่ได้เปิดระบบรับสมัคร: รัน sql/register.sql ใน Supabase SQL Editor' : esc(e.message)}</td></tr>`; }
+  };
+  const regAct = guard(async (id, a) => {
+    const r = A.regs.find(x => x.id === id); if (!r) return;
+    if (a === 'issue') {   // กรอกฟอร์มออกรหัสให้ แล้วให้ผู้ดูแลกด "ออกรหัส" เอง (เมื่อออกสำเร็จ คำขอนี้จะเปลี่ยนเป็น "ออกรหัสแล้ว")
+      $('#i-names').value = r.school;
+      $$('input[name=ig]').forEach(x => { x.checked = (r.grades || []).includes(+x.value); });
+      $('#i-note').value = `คำขอ ${r.ref} · ${r.contact} ${r.phone}${r.line_id ? ' LINE ' + r.line_id : ''}`;
+      A.fromReg = id;
+      $('#issue-card').scrollIntoView({ behavior: 'smooth', block: 'center' }); $('#i-go').focus();
+      toast('กรอกข้อมูลในฟอร์มออกรหัสให้แล้ว ตรวจสอบแล้วกด “ออกรหัส”', 'ok');
+      return;
+    }
+    if (a === 'cancel') {
+      const ok = await modal('ยกเลิกคำขอ', `<p>ยกเลิกคำขอของ <b>${esc(r.school)}</b>?</p>`, [{ label: 'ไม่', value: false }, { label: 'ยกเลิกคำขอ', cls: 'danger', value: true }]);
+      if (!ok) return;
+    }
+    await call('admin_registration_set', { p_id: id, p_status: a === 'cancel' ? 'cancel' : 'new' }); await loadRegs();
+  });
 
   const issue = guard(async () => {
     const names = $('#i-names').value.split('\n').map(x => x.trim()).filter(Boolean);
@@ -139,6 +180,7 @@
     try {
       const r = await call('admin_issue', { p_names: names, p_grades: grades, p_note: $('#i-note').value.trim() || null });
       $('#i-names').value = ''; $('#i-note').value = '';
+      if (A.fromReg) { await call('admin_registration_set', { p_id: A.fromReg, p_status: 'done' }).catch(() => {}); A.fromReg = null; }
       await load();
       await showCodes(`ออกรหัสแล้ว ${r.issued.length} โรงเรียน`, r.issued);
     } finally { $('#i-go').disabled = false; }
@@ -190,6 +232,8 @@
     $('#l-refresh').onclick = load;
     $('#l-q').oninput = (e) => { A.q = e.target.value; renderList(); };
     $('#l-filter').onclick = (e) => { const b = e.target.closest('[data-f]'); if (!b) return; A.filter = b.dataset.f; $$('#l-filter button').forEach(x => x.classList.toggle('on', x === b)); renderList(); };
+    $('#r-body').onclick = (e) => { const b = e.target.closest('[data-r]'); if (b) regAct(b.closest('tr').dataset.id, b.dataset.r); };
+    $('#r-filter').onclick = (e) => { const b = e.target.closest('[data-f]'); if (!b) return; A.rfilter = b.dataset.f; $$('#r-filter button').forEach(x => x.classList.toggle('on', x === b)); renderRegs(); };
     $('#l-body').onclick = (e) => { const b = e.target.closest('[data-a]'); if (b) act(b.closest('tr').dataset.id, b.dataset.a); };
     const saved = SS.get('pp_admin'); if (saved) login(saved);
   }

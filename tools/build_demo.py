@@ -40,6 +40,7 @@ html = open(os.path.join(ROOT, 'index.html'), encoding='utf-8').read()
 html = html.replace('<title>โปรแกรมแจ้งผลการศึกษา ปพ.5 และ ปพ.6</title>',
                     '<title>ทดลองใช้ — โปรแกรมแจ้งผลการศึกษา ปพ.5 และ ปพ.6</title>\n<meta name="robots" content="noindex">')
 html = re.sub(r'<p class="lead">.*?</p>', '<p class="lead">ทดลองใช้งานโปรแกรมได้ทุกเมนู พร้อมข้อมูลตัวอย่างครบทุกชั้น เพื่อประกอบการตัดสินใจก่อนสั่งซื้อ</p>', html, flags=re.S)
+html = html.replace('<a href="register.html">ดูรายละเอียดและสมัครใช้งาน</a>', '<a href="../register.html">ดูรายละเอียดและสั่งซื้อ</a>')   # เว็บตัวอย่างอยู่ในโฟลเดอร์ demo/ ของเว็บจริง
 html = html.replace('<script src="js/config.js"></script>', f'<script src="js/config.js?v={build}"></script>')
 open(os.path.join(OUT, 'index.html'), 'w', encoding='utf-8').write(html)
 print('built', OUT)
