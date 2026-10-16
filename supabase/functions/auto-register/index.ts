@@ -54,7 +54,21 @@ function accountMatches(masked: string, target: string): boolean {
   return t.includes(digits);
 }
 
-type Slip = { amount: number; date: string; transRef: string; account: string; name: string; raw: unknown };
+type Slip = { amount: number; date: string; transRef: string; account: string; name: string; bank: string; raw: unknown };
+
+// ตรวจผู้รับเงิน: ถ้าสลิปมีเลขบัญชี (เห็นอย่างน้อย 3 หลัก) ตรวจเลขบัญชี — ถ้าไม่มี (เช่น ผล API v2 บางรูปแบบ) ตรวจชื่อผู้รับ + ธนาคารแทน
+const BANK_CODE: Record<string, string> = { 'กรุงไทย': 'KTB', 'กสิกร': 'KBANK', 'ไทยพาณิชย์': 'SCB', 'กรุงเทพ': 'BBL', 'กรุงศรี': 'BAY', 'ทหารไทยธนชาต': 'TTB', 'ออมสิน': 'GSB', 'ธ.ก.ส.': 'BAAC', 'ยูโอบี': 'UOB', 'ซีไอเอ็มบี': 'CIMB', 'เกียรตินาคิน': 'KKP', 'แลนด์': 'LHB' };
+const TITLES = /^(นาย|นางสาว|นาง|น\.ส\.|ด\.ช\.|ด\.ญ\.|mr\.?|mrs\.?|ms\.?|miss)\s*/i;
+function firstName(n: string): string { return String(n || '').trim().replace(TITLES, '').trim().split(/\s+/)[0] || ''; }
+function receiverMatches(slip: Slip, S: Record<string, any>): { ok: boolean; how: string } {
+  const visible = String(slip.account || '').replace(/[^0-9]/g, '').length;
+  if (visible >= 3) return { ok: accountMatches(slip.account, S.account_no), how: `บัญชีผู้รับในสลิป (${slip.account}) ไม่ใช่บัญชีของร้าน` };
+  const want = firstName(S.account_name), got = String(slip.name || '').replace(TITLES, '').trim();
+  const nameOk = want.length >= 2 && got.length >= 2 && (got.includes(want) || (got.length >= 3 && want.startsWith(got.split(/\s+/)[0])));
+  const code = Object.entries(BANK_CODE).find(([k]) => String(S.bank || '').includes(k))?.[1];
+  const bankOk = !slip.bank || !code || slip.bank.toUpperCase() === code;
+  return { ok: nameOk && bankOk, how: `ผู้รับในสลิป (${slip.name || 'ไม่ทราบชื่อ'}${slip.bank ? ' · ' + slip.bank : ''}) ไม่ตรงกับบัญชีของร้าน` };
+}
 // kind: 'system' = ปัญหาฝั่งบริการตรวจสลิป (โควตาหมด / key ผิด / ล่ม) -> ลูกค้าไม่ผิด แจ้งข้อความกลาง ๆ และเตือนผู้ดูแล
 //       'slip'   = ปัญหาที่ตัวสลิป (อ่าน QR ไม่ได้ / ไม่พบรายการ)
 type Fail = { ok: false; kind: 'system' | 'slip'; reason: string; raw?: unknown };
@@ -71,7 +85,8 @@ function pickSlip(d: any): Slip {
   const date = String(d?.date || d?.transDate && `${d.transDate}T${d.transTime || '00:00:00'}+07:00` || d?.transactionDate || d?.dateTime || '');
   const account = String(acc.bank?.account || acc.proxy?.account || acc.value || acc.number || recv.bank?.account || recv.accountNumber || '');
   return { amount, date, transRef: String(d?.transRef || d?.transactionId || d?.ref || ''), account,
-    name: String(acc.name?.th || acc.name?.en || recv.name?.th || recv.name || recv.displayName || ''), raw: d };
+    name: String(acc.name?.th || acc.name?.en || recv.name?.th || recv.name || recv.displayName || ''),
+    bank: String(recv.bank?.short || recv.bank?.code || ''), raw: d };
 }
 function classify(status: number, msg: string, raw: unknown): Fail {
   if (/quota|limit|exceed|credit|insufficient/i.test(msg) || status === 429 || status === 402) return { ok: false, kind: 'system', reason: SYS.quota, raw };
@@ -140,11 +155,12 @@ Deno.serve(async (req) => {
     if (!v.ok) { reason = v.reason; system = v.kind === 'system'; slipInfo = { error: v.reason, kind: v.kind, raw: v.raw ?? null }; }
     else {
       const s = v.slip; transRef = s.transRef || null;
-      slipInfo = { amount: s.amount, date: s.date, account: s.account, name: s.name, transRef: s.transRef, raw: s.raw };
+      slipInfo = { amount: s.amount, date: s.date, account: s.account, name: s.name, bank: s.bank, transRef: s.transRef, raw: s.raw };
       const slipT = Date.parse(s.date), userT = Date.parse(String(st.transfer_at)), now = Date.now();
       const fails: string[] = [];
       if (!(Math.abs(s.amount - Number(st.amount)) < 0.005)) fails.push(`ยอดในสลิป ${s.amount} บาท ไม่ตรงกับยอดที่ต้องโอน ${st.amount} บาท`);
-      if (!accountMatches(s.account, S.account_no)) fails.push(`บัญชีผู้รับในสลิป (${s.account || 'ไม่ทราบ'}) ไม่ใช่บัญชีของร้าน`);
+      const rc = receiverMatches(s, S);
+      if (!rc.ok) fails.push(rc.how);
       if (!isFinite(slipT)) fails.push('อ่านเวลาโอนในสลิปไม่ได้');
       else {
         if (Math.abs(slipT - userT) > tol * 60_000) fails.push(`เวลาโอนในสลิปไม่ตรงกับที่กรอก (ต่างเกิน ${tol} นาที)`);
