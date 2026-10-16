@@ -7,6 +7,7 @@
   const $$ = (s, e) => Array.from((e || document).querySelectorAll(s));
   const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const cfg = window.PP_CONFIG || {}, SALES = cfg.SALES || {};
+  const MESSENGER = SALES.MESSENGER || 'https://www.facebook.com/messages/t/filevichakan/';
   const isDemo = !(cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY);
   const base = isDemo ? '' : cfg.SUPABASE_URL.replace(/\/$/, '');
   const H = isDemo ? {} : { apikey: cfg.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + cfg.SUPABASE_ANON_KEY, 'Content-Type': 'application/json' };
@@ -113,8 +114,8 @@
       box.innerHTML = `<div class="rg-ok wait">⏳</div><h3>ได้รับคำสั่งซื้อแล้ว — รอเจ้าหน้าที่ตรวจสอบ</h3>
         <p>เลขที่คำสั่งซื้อ <b class="rg-ref">${esc(res.ref || '')}</b> · ${esc(order.school)} · ชั้น ${esc(gl)}</p>
         ${res.reason ? `<p class="hint">ระบบตรวจอัตโนมัติไม่ผ่าน: ${esc(res.reason)}</p>` : ''}
-        <p>เจ้าหน้าที่จะตรวจสลิปและติดต่อกลับทางโทรศัพท์${order.line_id ? ' / LINE' : ''} พร้อมรหัสสิทธิ์ ไม่ต้องโอนเงินซ้ำ</p>
-        <div class="row" style="justify-content:center">${contactHtml()}</div>`;
+        <p><b>กรุณาติดต่อแอดมินทางแชทเพจ</b> แจ้งเลขที่คำสั่งซื้อ <b>${esc(res.ref || '')}</b> เพื่อรับรหัสสิทธิ์ — เจ้าหน้าที่จะตรวจสลิปและส่งรหัสให้ในแชท <b>ไม่ต้องโอนเงินซ้ำ</b></p>
+        <div class="row" style="justify-content:center"><a class="btn primary big" href="${esc(MESSENGER)}" target="_blank" rel="noopener">💬 แชทกับแอดมินทางเพจ</a></div>`;
     }
     box.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
