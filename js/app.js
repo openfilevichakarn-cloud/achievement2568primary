@@ -86,7 +86,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ' + roomLabel(g, room) + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261016r');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261016s');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -533,7 +533,7 @@
     zoom = Math.max(0.2, zoom * 0.985);
     // ปก ปพ.5: จัดกึ่งกลางหน้ากระดาษทั้งแนวนอนและแนวตั้ง
     const cover = /^ปก /.test(sheetName);
-    return { html: out.html, zoom, cover, fit: !!(pr.fitPage || fitBoth), land, m, hc: pr.hc || cover || !!(d.flex && d.flex.items), vc: cover, width: out.width * zoom };
+    return { html: out.html, zoom, stretch: cover || /^ปพ\.6 |^ป\.\d-2/.test(sheetName), fit: !!(pr.fitPage || fitBoth), land, m, hc: pr.hc || cover || !!(d.flex && d.flex.items), vc: cover, width: out.width * zoom };
   }
   // แบบบันทึกคะแนนรายวิชา: พิมพ์ 3 หน้า (เทอม 1 / เทอม 2 / สรุปทั้งปี) โดยซ่อนคอลัมน์ที่ไม่เกี่ยวในแต่ละหน้า
   const SCORE_PAGES = [
@@ -600,7 +600,7 @@
       if (v.mh) { st.maxHeight = (v.mh * rs) + 'px'; st.maxWidth = (v.mw * rs) + 'px'; }
     }
   }
-  // หน้าปก: ยืดความสูงแถวทุกแถวตามสัดส่วนให้ตารางสูงเต็ม 1 หน้า A4 (ทุกปกสูงเท่ากัน)
+  // หน้าปก / ปพ.6 (หน้า-หลัง): ยืดความสูงแถวทุกแถวตามสัดส่วนให้ตารางสูงเต็ม 1 หน้า A4 (ทุกหน้าสูงเท่ากัน)
   function stretchRows(z, c, target, rs) {
     const hs = c.rows.map(tr => tr.getBoundingClientRect().height), sum = hs.reduce((a, x) => a + x, 0);
     const extra = target - z.getBoundingClientRect().height;
@@ -638,7 +638,7 @@
         }
         if (best.TW !== TW) compactLayout(z, c, best.TW, rs);
         const k = best.k < 0.995 ? best.k * 0.99 : 1;
-        if (b.cover) stretchRows(z, c, availH / k * 0.995, rs);
+        if (b.stretch) stretchRows(z, c, availH / k * 0.995, rs);
         setZ(k); if (i === firstIdx) first = k;
         return;
       }
