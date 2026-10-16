@@ -86,7 +86,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ' + roomLabel(g, room) + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261016s');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261016t');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -533,7 +533,7 @@
     zoom = Math.max(0.2, zoom * 0.985);
     // ปก ปพ.5: จัดกึ่งกลางหน้ากระดาษทั้งแนวนอนและแนวตั้ง
     const cover = /^ปก /.test(sheetName);
-    return { html: out.html, zoom, stretch: cover || /^ปพ\.6 |^ป\.\d-2/.test(sheetName), fit: !!(pr.fitPage || fitBoth), land, m, hc: pr.hc || cover || !!(d.flex && d.flex.items), vc: cover, width: out.width * zoom };
+    return { html: out.html, zoom, p6: /^ปพ\.6 /.test(sheetName), stretch: cover || /^ปพ\.6 |^ป\.\d-2/.test(sheetName), fit: !!(pr.fitPage || fitBoth), land, m, hc: pr.hc || cover || !!(d.flex && d.flex.items), vc: cover, width: out.width * zoom };
   }
   // แบบบันทึกคะแนนรายวิชา: พิมพ์ 3 หน้า (เทอม 1 / เทอม 2 / สรุปทั้งปี) โดยซ่อนคอลัมน์ที่ไม่เกี่ยวในแต่ละหน้า
   const SCORE_PAGES = [
@@ -655,6 +655,15 @@
     if (!blocks.length) return;
     const root = $('#print-root');
     root.innerHTML = blocks.map(b => `<section class="pp-page ${b.land ? 'land' : 'port'}${b.vc ? ' vc' : ''}" style="padding:${b.m[2]}in ${b.m[1]}in ${b.m[3]}in ${b.m[0]}in"><div class="pp-zoom" style="zoom:${b.zoom};--bw:${1 / b.zoom}px${b.hc ? ';margin:0 auto;width:max-content' : ''}">${b.html}</div>${wmLayer(14)}</section>`).join('');
+    // ปพ.6: พิมพ์ชื่อนักเรียนต่อท้ายป้าย "ชื่อ - สกุล" ชิดซ้าย (หน้าจอแก้ไขคงเดิม)
+    root.querySelectorAll('.pp-page').forEach((sec, i) => {
+      if (!blocks[i].p6) return;
+      const a = sec.querySelector('td[data-r="3"][data-c="1"]'), b = sec.querySelector('td[data-r="3"][data-c="2"]');
+      if (!a || !b || !/ชื่อ/.test(a.textContent)) return;
+      const name = b.textContent.trim();
+      a.textContent = a.textContent.trim() + (name ? '\u2003' + name : ''); a.style.textAlign = 'left'; a.style.overflow = 'visible'; a.style.whiteSpace = 'pre';
+      b.textContent = ''; b.style.background = 'transparent';
+    });
     let bar = $('#pv-bar');
     if (!bar) {
       document.body.insertAdjacentHTML('beforeend', `<div id="pv-bar" class="pv-bar" role="toolbar" aria-label="ตัวอย่างก่อนพิมพ์">
