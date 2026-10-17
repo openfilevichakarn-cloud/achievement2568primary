@@ -6,10 +6,10 @@
 <meta name="theme-color" content="#1f5eff">
 <meta name="description" content="โปรแกรมแจ้งผลการศึกษา ปพ.5 และ ปพ.6 หลักสูตร 2568 ระดับประถมศึกษา ใช้งานผ่านเว็บ ทดลองใช้ฟรีก่อนสั่งซื้อ">
 <title>สมัครใช้งาน — โปรแกรมแจ้งผลการศึกษา ปพ.5 และ ปพ.6</title>
-<script src="js/theme.js?v=20261017g"></script>
-<link rel="stylesheet" href="css/app.css?v=20261017g">
-<link rel="stylesheet" href="css/ui.css?v=20261017g">
-<link rel="stylesheet" href="css/register.css?v=20261017g">
+<script src="js/theme.js?v=20261017h"></script>
+<link rel="stylesheet" href="css/app.css?v=20261017h">
+<link rel="stylesheet" href="css/ui.css?v=20261017h">
+<link rel="stylesheet" href="css/register.css?v=20261017h">
 </head>
 <body class="reg">
 
@@ -100,7 +100,10 @@
         <h3><span class="rg-n">3</span> ข้อมูลโรงเรียนและสลิป</h3>
         <div class="grid2">
           <label class="fld full"><span>ชื่อโรงเรียน (จะแสดงบนเอกสารทุกฉบับ และแก้เองไม่ได้) <b class="req">*</b></span><input name="school" required maxlength="200" placeholder="เช่น โรงเรียนบ้านตัวอย่าง"></label>
-          <label class="fld full"><span>วันและเวลาที่โอน (ตามสลิป) <b class="req">*</b></span><input name="transfer_at" type="datetime-local" required></label>
+          <div class="fld full"><span>วันและเวลาที่โอน (ตามสลิป) <b class="req">*</b></span>
+            <div class="rg-dt" id="tdt"><select name="t_d" aria-label="วันที่"></select><select name="t_m" aria-label="เดือน"></select><select name="t_y" aria-label="ปี พ.ศ."></select>
+              <span class="rg-at">เวลา</span><select name="t_hh" aria-label="ชั่วโมง"></select><b>:</b><select name="t_mi" aria-label="นาที"></select><span class="rg-at">น.</span></div>
+            <small class="hint">เวลาแบบ 24 ชั่วโมงตามสลิป เช่น 20:49 (= 2 ทุ่ม 49 นาที)</small></div>
           <div class="fld full"><span>รูปสลิปการโอนเงิน <b class="req">*</b></span>
             <label class="rg-slip"><input type="file" id="slip" accept="image/*"><span id="slip-label">📎 เลือกรูปสลิป</span></label></div>
           <div class="fld full"><img id="slip-preview" class="rg-slipimg" alt="ตัวอย่างสลิป" hidden><p id="slip-qr" class="hint" hidden></p></div>
@@ -149,8 +152,8 @@
 </footer>
 
 <div id="toasts" class="toasts" aria-live="polite"></div>
-<script src="js/config.js?v=20261017g"></script>
+<script src="js/config.js?v=20261017h"></script>
 <script src="js/vendor/jsQR.js?v=1.4.0"></script>
-<script src="js/register.js?v=20261017g"></script>
+<script src="js/register.js?v=20261017h"></script>
 </body>
 </html>
