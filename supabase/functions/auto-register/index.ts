@@ -83,12 +83,23 @@ const SYS = {
   down: '[ระบบ] ติดต่อบริการตรวจสลิป EasySlip ไม่ได้ — ตรวจคำสั่งซื้อนี้เอง',
   nokey: '[ระบบ] ยังไม่ได้ตั้งค่า EASYSLIP_API_KEY — ตรวจคำสั่งซื้อนี้เอง',
 };
+// เวลาในสลิปเป็นเวลาไทย: ถ้าผลตรวจไม่ระบุเขตเวลา (เช่น 2026-10-17T20:49:00 หรือ 2026-10-17 20:49:00) ให้ถือเป็น +07:00
+// (เซิร์ฟเวอร์ทำงานเวลา UTC — ถ้าไม่เติมจะคลาด 7 ชั่วโมง) · ตัวเลข = epoch (วินาที/มิลลิวินาที)
+function slipDate(x: unknown): string {
+  if (typeof x === 'number' && isFinite(x)) return new Date(x < 1e12 ? x * 1000 : x).toISOString();
+  let s = String(x || '').trim(); if (!s) return '';
+  if (/^\d{8}$/.test(s.slice(0, 8)) && !s.includes('-')) s = `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}${s.slice(8)}`;   // 20261017T20:49:00
+  s = s.replace(/^(\d{4}-\d{2}-\d{2})[ T](\d{1,2}:\d{2}(:\d{2}(\.\d+)?)?)/, (_, a, b) => `${a}T${b.length <= 5 ? b.padStart(5, '0') + ':00' : b.padStart(8, '0')}`);
+  if (/^\d{4}-\d{2}-\d{2}T[\d:.]+$/.test(s)) s += '+07:00';
+  return s;
+}
+const hhmm = (t: number) => { const d = new Date(t + 7 * 3600_000); return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`; };
 // ดึงค่าจากผลตรวจ (รองรับชื่อฟิลด์ทั้ง v1 / v2)
 function pickSlip(d: any): Slip {
   const recv = d?.receiver || {}, acc = recv.account || {};
   const amount = Number(d?.amount?.amount ?? d?.amount?.value ?? d?.amountInSlip ?? d?.amount);
   const m = d?.matchedAccount || d?.matched_account;
-  const date = String(d?.date || d?.transDate && `${d.transDate}T${d.transTime || '00:00:00'}+07:00` || d?.transactionDate || d?.dateTime || '');
+  const date = slipDate(d?.date || d?.transDate && `${d.transDate}T${d.transTime || '00:00:00'}` || d?.transactionDate || d?.transTimestamp || d?.dateTime || '');
   const account = String(acc.bank?.account || acc.proxy?.account || acc.value || acc.number || recv.bank?.account || recv.accountNumber || '');
   return { amount, date, transRef: String(d?.transRef || d?.transactionId || d?.ref || ''), account,
     name: String(acc.name?.th || acc.name?.en || recv.name?.th || recv.name || recv.displayName || ''),
@@ -189,7 +200,7 @@ Deno.serve(async (req) => {
       if (!rc.ok) fails.push(rc.how);
       if (!isFinite(slipT)) fails.push('อ่านเวลาโอนในสลิปไม่ได้');
       else {
-        if (Math.abs(slipT - userT) > tol * 60_000) fails.push(`เวลาโอนในสลิปไม่ตรงกับที่กรอก (ต่างเกิน ${tol} นาที)`);
+        if (Math.abs(slipT - userT) > tol * 60_000) fails.push(`เวลาโอนในสลิป (${hhmm(slipT)} น.) ไม่ตรงกับที่กรอก (${isFinite(userT) ? hhmm(userT) + ' น.' : '-'}) ต่างเกิน ${tol} นาที`);
         if (now - slipT > 3 * 86_400_000) fails.push('สลิปเก่าเกิน 3 วัน');
         if (slipT - now > 10 * 60_000) fails.push('เวลาในสลิปเป็นเวลาในอนาคต');
       }

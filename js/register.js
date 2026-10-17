@@ -146,7 +146,15 @@
     $('#all-grades').onclick = () => { const cb = $$('[name=grades]'); const on = !cb.every(x => x.checked); cb.forEach(x => { x.checked = on; }); updateAmount(); };
     $$('[name=grades]').forEach(x => x.addEventListener('change', updateAmount));
     $('#copy-acc').onclick = () => copy(String(INFO && INFO.account_no || '9600441464').replace(/\D/g, ''));
-    const now = new Date(Date.now() - new Date().getTimezoneOffset() * 60000); $('[name=transfer_at]').value = now.toISOString().slice(0, 16);
+    // วันเวลาที่โอน: เลือก วัน/เดือน/ปี พ.ศ. และเวลา 24 ชม. — ยึดเวลาประเทศไทยเสมอ (ไม่ขึ้นกับภาษา/เขตเวลาของเครื่อง)
+    const TH_M = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+    const bkk = new Date(Date.now() + 7 * 3600000), pad = (x) => String(x).padStart(2, '0');
+    const opts = (name, list, sel) => { $(`[name=${name}]`).innerHTML = list.map(([v, t]) => `<option value="${v}"${v === sel ? ' selected' : ''}>${t}</option>`).join(''); };
+    opts('t_d', Array.from({ length: 31 }, (_, i) => [i + 1, String(i + 1)]), bkk.getUTCDate());
+    opts('t_m', TH_M.map((m, i) => [i + 1, m]), bkk.getUTCMonth() + 1);
+    opts('t_y', [bkk.getUTCFullYear(), bkk.getUTCFullYear() - 1].map(y => [y, String(y + 543)]), bkk.getUTCFullYear());
+    opts('t_hh', Array.from({ length: 24 }, (_, i) => [i, pad(i)]), bkk.getUTCHours());
+    opts('t_mi', Array.from({ length: 60 }, (_, i) => [i, pad(i)]), bkk.getUTCMinutes());
     $('#slip').addEventListener('change', async (e) => {
       const f = e.target.files[0]; if (!f) return;
       try {
@@ -163,13 +171,16 @@
       e.preventDefault();
       const f = e.target, v = (n) => (f.elements[n].value || '').trim(), err = $('#reg-err');
       const g = grades(), amount = priceFor(g.length);
-      const t = v('transfer_at'), tDate = t ? new Date(t) : null;
-      const order = { school: v('school'), website: v('website'), grades: g, amount, transfer_at: tDate && !isNaN(tDate) ? tDate.toISOString() : '', slip_image: slipData, slip_qr: slipQr };
+      const n = (k) => +f.elements[k].value, pd = (x) => String(x).padStart(2, '0');
+      const y = n('t_y'), mo = n('t_m'), d = n('t_d');
+      const okDate = new Date(Date.UTC(y, mo - 1, d)).getUTCDate() === d;   // กัน 31 กุมภาพันธ์
+      const order = { school: v('school'), website: v('website'), grades: g, amount,
+        transfer_at: okDate ? `${y}-${pd(mo)}-${pd(d)}T${pd(n('t_hh'))}:${pd(n('t_mi'))}:00+07:00` : '', slip_image: slipData, slip_qr: slipQr };
       const bad = (msg, n) => { err.textContent = msg; if (n) f.elements[n].focus(); };
       if (!g.length) return bad('กรุณาเลือกชั้นที่ต้องการอย่างน้อย 1 ชั้น');
       if (amount == null) return bad('ยังไม่เปิดสั่งซื้อชั้นที่เลือก กรุณาติดต่อทางเพจ');
       if (order.school.length < 3) return bad('กรุณากรอกชื่อโรงเรียน', 'school');
-      if (!order.transfer_at) return bad('กรุณากรอกวันและเวลาที่โอน', 'transfer_at');
+      if (!order.transfer_at) return bad('วันที่โอนไม่ถูกต้อง กรุณาตรวจวันที่และเดือน', 't_d');
       if (!slipData) return bad('กรุณาแนบรูปสลิปการโอนเงิน');
       if (!$('#consent').checked) return bad('กรุณาติ๊กยอมรับข้อกำหนดก่อนส่ง');
       err.textContent = ''; const btn = $('#reg-go'); btn.disabled = true; btn.textContent = 'กำลังตรวจสลิป...';
