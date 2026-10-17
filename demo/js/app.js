@@ -86,7 +86,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ' + roomLabel(g, room) + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261017d');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261017e');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -384,6 +384,12 @@
     try { return fn(); } finally { S.batch--; if (!S.batch && S.pendingDirty) { S.pendingDirty = false; markDirty(); } }
   }
   // กำหนดค่า + ตรวจ + มาโคร (คืน true ถ้าสำเร็จ)
+  // เขียนค่าตรง ๆ ไม่ตรวจเงื่อนไขช่อง (ใช้ใส่ "ย้าย" ในช่องคะแนนที่รับเฉพาะตัวเลข)
+  function setRaw(sheet, r, c, val) {
+    S.wb.setValue(sheet, { r, c }, val);
+    (S.userEdits[sheet] = S.userEdits[sheet] || {})[P.numToCol(c) + r] = val;
+    markDirty();
+  }
   function applyValue(sheet, r, c, val) {
     const tgt = M.redirectStudent(ctx(), sheet, r, c);
     const sName = tgt ? tgt.sheet : sheet, rr = tgt ? tgt.r : r, cc = tgt ? tgt.c : c;
@@ -832,6 +838,6 @@
   document.addEventListener('DOMContentLoaded', boot);
   window.PPApp = {
     S, ctx, toast, roomLabel, modal, applyValue, validate, markDirty, save, batch, printSheets, printOne, printAll, printBlock,
-    applyToSchool, otherRoomCount, classText, syncSchoolInfo, SCHOOL_REFS, openDoc, closeDoc, refreshDoc, printSet, printScores, exportBackup, pickBackup, openCover, pickLogo: () => $('#logo-file').click(), removeLogo, setStatus, flushSave,
+    setRaw, applyToSchool, otherRoomCount, classText, syncSchoolInfo, SCHOOL_REFS, openDoc, closeDoc, refreshDoc, printSet, printScores, exportBackup, pickBackup, openCover, pickLogo: () => $('#logo-file').click(), removeLogo, setStatus, flushSave,
   };
 })();
