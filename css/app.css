@@ -177,5 +177,8 @@ table.xl td.sx{font-family:'TH Sarabun New','Sarabun',sans-serif}
 .mvlist{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;max-height:260px;overflow:auto}
 .mvchip{font:inherit;font-size:.9rem;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
 .mvchip:hover{border-color:var(--brand)}
+.mvpick select{width:100%;max-width:520px;margin-top:6px}
+.mvx{font:inherit;border:0;background:transparent;color:inherit;cursor:pointer;margin-left:6px;padding:0 2px;font-weight:700}
+.mvx:hover{color:var(--err)}
 .mvchip.on{background:#fff7ed;border-color:#f59e0b;color:#92400e}
 input.gc.mv{color:#b45309;font-weight:600;background:#fff7ed}
