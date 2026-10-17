@@ -74,13 +74,26 @@
   const activeInds = (sc, T) => SC[T].ind.filter(c => get(sc, 4, c) !== null && get(sc, 4, c) !== '');
   // ช่องที่ต้องกรอก = ตัวชี้วัดที่ใช้งาน + สอบ ที่คะแนนเต็มมากกว่า 0
   const scInputs = (sc, T) => [...activeInds(sc, T), SC[T].exam].filter(c => (num(sc, 4, c) ?? 0) > 0);
-  // นักเรียนออกกลางปี (ย้าย): ช่องคะแนน / คุณลักษณะ / กิจกรรม ทุกช่องเป็น "ย้าย" — สูตรนับ/รวมข้ามข้อความ จึงไม่ถูกนำมาคำนวณ
-  const MOVED = 'ย้าย';
-  const isMoved = (st) => !!L.trait(1) && txt(L.trait(1), stuTraitRow(st.r), 3) === MOVED;
-  function movedCells(st) {
-    const out = [], rs = stuScoreRow(st.r), rt = stuTraitRow(st.r);
-    for (const s of subjects()) for (const c of SC_EDIT) if (c !== SC.note) out.push([L.score(s.slot), rs, c]);
-    for (const kind of ['trait', 'act']) for (const t of [1, 2]) { const sh = asSheet(kind, t); if (sh) for (const c of range(3, AS[kind].max)) out.push([sh, rt, c]); }
+  // นักเรียนออกกลางปี (ย้าย): ช่องคะแนน / คุณลักษณะ / กิจกรรม เป็น "ย้าย" — สูตรนับ/รวมข้ามข้อความ จึงไม่ถูกนำมาคำนวณ
+  //  ย้ายเทอม 1 = ใส่ทั้ง 2 เทอม · ย้ายเทอม 2 = ใส่เฉพาะเทอม 2 (ผลเทอม 1 คงไว้ ผลทั้งปีเป็นค่าว่าง)
+  //  ค่าเดิมก่อนใส่ "ย้าย" เก็บไว้ที่คอลัมน์ AZ ของแถวนักเรียน (นอกพื้นที่เอกสาร) เพื่อคืนค่าเมื่อยกเลิก
+  const MOVED = 'ย้าย', MV_COL = 52;
+  function mvInfo(st) {
+    const raw = txt(L.stu, st.r, MV_COL);
+    if (raw) { try { const m = JSON.parse(raw); if (m && (m.t === 1 || m.t === 2)) return m; } catch (e) { /* ข้อมูลเสีย */ } }
+    // ข้อมูลรุ่นก่อน (ไม่มีบันทึก): ดูจากช่องคุณลักษณะ
+    const rt = stuTraitRow(st.r);
+    if (L.trait(1) && txt(L.trait(1), rt, 3) === MOVED) return { t: 1, v: {} };
+    if (L.trait(2) && txt(L.trait(2), rt, 3) === MOVED) return { t: 2, v: {} };
+    return null;
+  }
+  const isMoved = (st) => !!mvInfo(st);
+  // ไม่นับในผลของช่วงเวลา T (1 / 2 / 'sum'): ย้ายเทอม 2 ยังนับในเทอม 1
+  const movedFor = (st, T) => { const m = mvInfo(st); return !!m && !(T === 1 && m.t === 2); };
+  function movedCells(st, t) {
+    const out = [], rs = stuScoreRow(st.r), rt = stuTraitRow(st.r), terms = t === 2 ? [2] : [1, 2];
+    for (const s of subjects()) for (const T of terms) for (const c of [...SC[T].ind, SC[T].exam]) out.push([L.score(s.slot), rs, c]);
+    for (const kind of ['trait', 'act']) for (const T of terms) { const sh = asSheet(kind, T); if (sh) for (const c of range(3, AS[kind].max)) out.push([sh, rt, c]); }
     return out;
   }
   function movedCounts() {
@@ -90,16 +103,32 @@
   }
   async function toggleMoved(r) {
     const st = students().find(s => s.r === r); if (!st) return;
-    const on = !isMoved(st);
-    const ok = await uiModal(on
-      ? { title: 'นักเรียนออกกลางปี', ok: 'ตั้งเป็น “ย้าย”', danger: true, body: `<p>ตั้ง <b>${esc(st.name)}</b> เป็นนักเรียนออกกลางปี</p><ul class="hint" style="margin:6px 0 0 18px"><li>ใส่ “ย้าย” ในช่องคะแนนทุกวิชา คุณลักษณะ และกิจกรรม ทั้ง 2 เทอม (คะแนนที่กรอกไว้จะถูกแทนที่)</li><li>ไม่นำมาคำนวณผลและสถิติ · นับเป็น “ออกกลางปี” ในหน้าปก ปพ.5 อัตโนมัติ</li></ul>` }
-      : { title: 'ยกเลิกการย้าย', ok: 'ยกเลิกการย้าย', body: `<p>ยกเลิกสถานะย้ายของ <b>${esc(st.name)}</b>? ช่องที่เป็น “ย้าย” จะว่าง ต้องกรอกคะแนน/ผลประเมินใหม่</p>` });
-    if (!ok) return;
-    A().batch(() => {
-      for (const [sh, rr, c] of movedCells(st)) { const v = get(sh, rr, c); if (on || v === MOVED) A().setRaw(sh, rr, c, on ? MOVED : null); }
-      movedCounts();
-    });
-    A().toast(on ? `ตั้ง ${st.name} เป็นนักเรียนย้ายแล้ว` : `ยกเลิกการย้ายของ ${st.name} แล้ว`, 'ok');
+    const cur = mvInfo(st);
+    if (!cur) {
+      const t = await uiModal({ title: 'นักเรียนออกกลางปี', ok: 'ตั้งเป็น “ย้าย”', danger: true,
+        body: `<p>ตั้ง <b>${esc(st.name)}</b> เป็นนักเรียนออกกลางปี — ย้ายออกระหว่าง</p>
+          <label class="chk" style="display:block;margin:6px 0"><input type="radio" name="mvt" value="1" checked> <b>เทอม 1</b> — ใส่ “ย้าย” ทั้ง 2 เทอม (ไม่มีผลการเรียนทั้งปี)</label>
+          <label class="chk" style="display:block;margin:6px 0"><input type="radio" name="mvt" value="2"> <b>เทอม 2</b> — คงคะแนน/ผลประเมินเทอม 1 ไว้ ใส่ “ย้าย” เฉพาะเทอม 2</label>
+          <p class="hint">ใส่ “ย้าย” ในช่องคะแนนทุกวิชา คุณลักษณะ และกิจกรรม · ไม่นำมาคำนวณ · นับเป็น “ออกกลางปี” ในหน้าปกอัตโนมัติ · คะแนนเดิมเก็บไว้ ยกเลิกแล้วได้คืน</p>`,
+        read: (el) => +(el.querySelector('input[name=mvt]:checked') || {}).value || 1 });
+      if (!t) return;
+      const v = {};
+      A().batch(() => {
+        for (const [sh, rr, c] of movedCells(st, t)) { const x = get(sh, rr, c); if (x !== null && x !== MOVED) v[sh + '|' + rr + '|' + c] = x; A().setRaw(sh, rr, c, MOVED); }
+        A().setRaw(L.stu, st.r, MV_COL, JSON.stringify({ t, v }));
+        movedCounts();
+      });
+      A().toast(`ตั้ง ${st.name} เป็นนักเรียนย้าย (เทอม ${t}) แล้ว`, 'ok');
+    } else {
+      const ok = await uiModal({ title: 'ยกเลิกการย้าย', ok: 'ยกเลิกการย้าย', body: `<p>ยกเลิกสถานะย้ายของ <b>${esc(st.name)}</b>? คะแนนและผลประเมินเดิมก่อนตั้งย้ายจะกลับมา</p>` });
+      if (!ok) return;
+      A().batch(() => {
+        for (const [sh, rr, c] of movedCells(st, cur.t)) if (get(sh, rr, c) === MOVED) A().setRaw(sh, rr, c, cur.v[sh + '|' + rr + '|' + c] ?? null);
+        A().setRaw(L.stu, st.r, MV_COL, null);
+        movedCounts();
+      });
+      A().toast(`ยกเลิกการย้ายของ ${st.name} แล้ว (คืนคะแนนเดิม)`, 'ok');
+    }
     refresh();
   }
   function students() {
@@ -235,7 +264,7 @@
         ${field('ออกกลางปี — หญิง (คน)', `<input type="text" value="${esc(txt(cov, 8, 9) || '0')}" disabled>`)}
       </div>
       <div class="fld" style="margin-top:10px"><span>เลือกนักเรียนที่ออกกลางปี (ย้าย) — นับจำนวนชาย/หญิงให้อัตโนมัติ</span>
-        <div class="mvlist">${students().map(st => { const m = isMoved(st); return `<button class="mvchip${m ? ' on' : ''}" data-act="moved" data-r="${st.r}" title="${m ? 'แตะเพื่อยกเลิกการย้าย' : 'แตะเพื่อตั้งเป็นนักเรียนย้าย'}">${m ? '✓ ' : ''}${esc(st.no)}. ${esc(st.name)}${m ? ' <b>ย้าย</b>' : ''}</button>`; }).join('') || '<span class="hint">ยังไม่มีรายชื่อนักเรียน</span>'}</div></div>
+        <div class="mvlist">${students().map(st => { const m = mvInfo(st); return `<button class="mvchip${m ? ' on' : ''}" data-act="moved" data-r="${st.r}" title="${m ? 'แตะเพื่อยกเลิกการย้าย' : 'แตะเพื่อตั้งเป็นนักเรียนย้าย'}">${m ? '✓ ' : ''}${esc(st.no)}. ${esc(st.name)}${m ? ` <b>ย้าย เทอม ${m.t}</b>` : ''}</button>`; }).join('') || '<span class="hint">ยังไม่มีรายชื่อนักเรียน</span>'}</div></div>
       <div class="grid2">
         ${field('เข้าระหว่างปี — ชาย (คน)', inputFor(cov, 9, 6, { kind: 'n', mode: 'numeric' }))}
         ${field('เข้าระหว่างปี — หญิง (คน)', inputFor(cov, 9, 9, { kind: 'n', mode: 'numeric' }))}
@@ -292,6 +321,7 @@
     }
     A().batch(() => {
       for (const c of [2, 3, 4]) setv(L.stu, r, c, null);
+      if (txt(L.stu, r, MV_COL)) A().setRaw(L.stu, r, MV_COL, null);
       for (const s of subjects()) for (const c of SC_EDIT) setv(L.score(s.slot), stuScoreRow(r), c, null);
       for (const t of [1, 2]) {
         for (let c = 3; c < 3 + AS.trait.max; c++) setv(L.trait(t), stuTraitRow(r), c, null);
@@ -640,7 +670,7 @@
   function assessSheet() { return U.kind === 'trait' ? L.trait(U.aTerm) : L.act(U.aTerm); }
   function setAssessAll(v, col) {
     const sheet = assessSheet(); const cols = col ? [col] : activeItems(U.kind);
-    A().batch(() => { for (const st of students()) if (!isMoved(st)) for (const c of cols) setv(sheet, stuTraitRow(st.r), c, v === '' ? null : v); });
+    A().batch(() => { for (const st of students()) if (!movedFor(st, U.aTerm === 'y' ? 'sum' : +U.aTerm)) for (const c of cols) setv(sheet, stuTraitRow(st.r), c, v === '' ? null : v); });
     refresh();
   }
 
@@ -762,7 +792,7 @@
   }
   // ตารางสรุป ปพ.5 ของเทอมที่เลือก (คำนวณจากชีทคะแนน/คุณลักษณะ/กิจกรรม)
   function p5Summary(T, subs) {
-    const all = students(), stu = all.filter(s => !isMoved(s)), n = stu.length, nMv = all.length - n;
+    const all = students(), stu = all.filter(s => !movedFor(s, T)), n = stu.length, nMv = all.length - n;
     const col = T === 'sum' ? { tot: SC.year, lvl: SC.yearLvl } : { tot: SC[T].tot, lvl: SC[T].lvl };
     const male = stu.filter(s => s.sex === 'ชาย').length, female = stu.filter(s => s.sex === 'หญิง').length;
     const fmt = (x, d = 1) => x === null ? '–' : (Math.round(x * 10 ** d) / 10 ** d).toLocaleString('th-TH');
@@ -946,7 +976,7 @@
     ['school', 'ตั้งค่าข้อมูลโรงเรียน', 'data:school', `
       <p>เมนู <b>ข้อมูล → โรงเรียน</b></p>
       <ul><li>กรอกปีการศึกษา สังกัด ชื่อครูประจำชั้น หัวหน้างานวิชาการ รองผู้อำนวยการ และผู้อำนวยการ — ชื่อจะไปปรากฏในช่องลงนามของ ปพ.5 / ปพ.6 อัตโนมัติ</li>
-      <li><b>นักเรียนออกกลางปี (ย้าย)</b>: ในการ์ด “นักเรียนออก / เข้าระหว่างปีการศึกษา” แตะชื่อนักเรียน — ระบบใส่ “ย้าย” ในช่องคะแนน คุณลักษณะ กิจกรรมทุกช่อง ไม่นำมาคำนวณ และนับจำนวนออกกลางปีในหน้าปกให้อัตโนมัติ (แตะอีกครั้งเพื่อยกเลิก)</li>
+      <li><b>นักเรียนออกกลางปี (ย้าย)</b>: ในการ์ด “นักเรียนออก / เข้าระหว่างปีการศึกษา” แตะชื่อนักเรียนแล้วเลือกว่าย้ายออกระหว่าง <b>เทอม 1</b> (ใส่ “ย้าย” ทั้ง 2 เทอม) หรือ <b>เทอม 2</b> (คงผลเทอม 1 ไว้ ใส่ “ย้าย” เฉพาะเทอม 2) — ไม่นำมาคำนวณ และนับจำนวนออกกลางปีในหน้าปกให้อัตโนมัติ · แตะอีกครั้งเพื่อยกเลิก คะแนนเดิมจะกลับมา</li>
       <li><b>ไม่มีรองผู้อำนวยการ</b> หรือ <b>ไม่มีหัวหน้างานวิชาการ</b>: เว้นว่างไว้ ระบบจะซ่อนบรรทัดลงนามนั้นและจัดตำแหน่งลายเซ็นให้เอง</li>
       <li>กด <b>เลือกรูปตรา</b> เพื่อใส่ตราโรงเรียน (PNG/JPG) จะแสดงบนหน้าปกทุกฉบับ</li>
       <li>กรอกจำนวนนักเรียนออกกลางปี / เข้าระหว่างปี (ถ้าไม่มี ใส่ 0) ใช้ในหน้าปก ปพ.5</li></ul>`],
