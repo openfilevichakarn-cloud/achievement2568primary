@@ -160,6 +160,33 @@
     try { const r = await call('admin_orders', {}); A.orders = r.items || []; A.sales = r.settings || {}; renderOrders(); }
     catch (e) { $('#o-body').innerHTML = `<tr><td colspan="7" class="hint" style="padding:18px">${/not find|does not exist|ยังไม่ได้อัปเดต/i.test(e.message) ? 'ยังไม่ได้เปิดระบบสั่งซื้อ: รัน sql/orders.sql ใน Supabase SQL Editor' : esc(e.message)}</td></tr>`; }
   };
+  // ---------------------------------------------------------------- รีเฟรชอัตโนมัติ (ไม่ต้องกด F5)
+  // ทุก 20 วินาทีขณะเปิดหน้านี้อยู่ + ทันทีเมื่อกลับมาที่แท็บ · ข้ามรอบที่มีหน้าต่างเปิดอยู่ · วาดใหม่เฉพาะเมื่อข้อมูลเปลี่ยน
+  const LIVE_MS = 20000, BASE_TITLE = document.title;
+  let liveTimer = null, liveBusy = false;
+  const waitIds = () => new Set(A.orders.filter(o => o.status === 'review' || o.status === 'checking').map(o => o.id));
+  function liveTitle() { const n = waitIds().size; document.title = (n ? `(${n}) ` : '') + BASE_TITLE; }
+  function liveStamp() { $('#o-live').textContent = `อัปเดตอัตโนมัติทุก ${LIVE_MS / 1000} วินาที · ล่าสุด ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} น.`; }
+  async function liveTick() {
+    if (liveBusy || !A.pass || document.hidden || !$('#modal').hidden) return;
+    liveBusy = true;
+    try {
+      const [o, l] = await Promise.all([call('admin_orders', {}), call('admin_list', {})]);
+      const before = waitIds(), oj = JSON.stringify(o.items || []), lj = JSON.stringify(l.schools || []);
+      if (oj !== JSON.stringify(A.orders) || JSON.stringify(o.settings || {}) !== JSON.stringify(A.sales)) {
+        A.orders = o.items || []; A.sales = o.settings || {}; renderOrders();
+        const fresh = [...waitIds()].filter(id => !before.has(id)).length;
+        if (fresh) toast(`มีคำสั่งซื้อใหม่รอตรวจ ${fresh} รายการ`, 'warn');
+      }
+      if (lj !== JSON.stringify(A.schools)) { A.schools = l.schools || []; renderList(); }
+      liveTitle(); liveStamp();
+    } catch (e) { if (e.denied) { logout(); $('#a-err').textContent = e.message; } else $('#o-live').textContent = 'อัปเดตอัตโนมัติไม่สำเร็จ (จะลองใหม่) — ' + (e.message || ''); }
+    finally { liveBusy = false; }
+  }
+  function liveStart() { clearInterval(liveTimer); liveTimer = setInterval(liveTick, LIVE_MS); liveTitle(); liveStamp(); }
+  function liveStop() { clearInterval(liveTimer); liveTimer = null; document.title = BASE_TITLE; }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && liveTimer) liveTick(); });
+
   const orderAct = guard(async (id, a) => {
     const o = A.orders.find(x => x.id === id); if (!o) return;
     if (a === 'slip') {
@@ -249,14 +276,14 @@
   });
 
   // ---------------------------------------------------------------- login
-  function logout() { A.pass = null; SS.del('pp_admin'); $('#a-app').hidden = true; $('#a-login').hidden = false; }
+  function logout() { liveStop(); A.pass = null; SS.del('pp_admin'); $('#a-app').hidden = true; $('#a-login').hidden = false; }
   async function login(pass) {
     A.pass = pass; $('#a-err').textContent = '';
     try { await call('admin_login', {}); }
     catch (e) { A.pass = null; SS.del('pp_admin'); $('#a-err').textContent = e.message; return; }
     SS.set('pp_admin', pass);
     $('#a-login').hidden = true; $('#a-app').hidden = false;
-    await load();
+    await load(); liveStart();
   }
 
   function boot() {

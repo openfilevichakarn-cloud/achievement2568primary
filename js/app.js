@@ -86,7 +86,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ' + roomLabel(g, room) + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261017h');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261017i');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
