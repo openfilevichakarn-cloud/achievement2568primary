@@ -264,7 +264,8 @@
         ${field('ออกกลางปี — หญิง (คน)', `<input type="text" value="${esc(txt(cov, 8, 9) || '0')}" disabled>`)}
       </div>
       <div class="fld" style="margin-top:10px"><span>เลือกนักเรียนที่ออกกลางปี (ย้าย) — นับจำนวนชาย/หญิงให้อัตโนมัติ</span>
-        <div class="mvlist">${students().map(st => { const m = mvInfo(st); return `<button class="mvchip${m ? ' on' : ''}" data-act="moved" data-r="${st.r}" title="${m ? 'แตะเพื่อยกเลิกการย้าย' : 'แตะเพื่อตั้งเป็นนักเรียนย้าย'}">${m ? '✓ ' : ''}${esc(st.no)}. ${esc(st.name)}${m ? ` <b>ย้าย เทอม ${m.t}</b>` : ''}</button>`; }).join('') || '<span class="hint">ยังไม่มีรายชื่อนักเรียน</span>'}</div></div>
+        <div class="mvpick"><select data-act-change="moved-add" aria-label="เลือกนักเรียนที่ออกกลางปี"><option value="">— เลือกนักเรียนที่ย้ายออก —</option>${students().filter(st => !isMoved(st)).map(st => `<option value="${st.r}">${esc(st.no)}. ${esc(st.name)}${st.sex ? ` (${esc(st.sex)})` : ''}</option>`).join('')}</select></div>
+        ${(() => { const mv = students().filter(isMoved); return mv.length ? `<div class="mvlist">${mv.map(st => `<span class="mvchip on">${esc(st.no)}. ${esc(st.name)} <b>ย้าย เทอม ${mvInfo(st).t}</b><button class="mvx" data-act="moved" data-r="${st.r}" title="ยกเลิกการย้าย (คืนคะแนนเดิม)" aria-label="ยกเลิกการย้าย ${esc(st.name)}">✕</button></span>`).join('')}</div>` : '<p class="hint" style="margin:6px 0 0">ยังไม่มีนักเรียนย้ายออก</p>'; })()}</div>
       <div class="grid2">
         ${field('เข้าระหว่างปี — ชาย (คน)', inputFor(cov, 9, 6, { kind: 'n', mode: 'numeric' }))}
         ${field('เข้าระหว่างปี — หญิง (คน)', inputFor(cov, 9, 9, { kind: 'n', mode: 'numeric' }))}
@@ -976,7 +977,7 @@
     ['school', 'ตั้งค่าข้อมูลโรงเรียน', 'data:school', `
       <p>เมนู <b>ข้อมูล → โรงเรียน</b></p>
       <ul><li>กรอกปีการศึกษา สังกัด ชื่อครูประจำชั้น หัวหน้างานวิชาการ รองผู้อำนวยการ และผู้อำนวยการ — ชื่อจะไปปรากฏในช่องลงนามของ ปพ.5 / ปพ.6 อัตโนมัติ</li>
-      <li><b>นักเรียนออกกลางปี (ย้าย)</b>: ในการ์ด “นักเรียนออก / เข้าระหว่างปีการศึกษา” แตะชื่อนักเรียนแล้วเลือกว่าย้ายออกระหว่าง <b>เทอม 1</b> (ใส่ “ย้าย” ทั้ง 2 เทอม) หรือ <b>เทอม 2</b> (คงผลเทอม 1 ไว้ ใส่ “ย้าย” เฉพาะเทอม 2) — ไม่นำมาคำนวณ และนับจำนวนออกกลางปีในหน้าปกให้อัตโนมัติ · แตะอีกครั้งเพื่อยกเลิก คะแนนเดิมจะกลับมา</li>
+      <li><b>นักเรียนออกกลางปี (ย้าย)</b>: ในการ์ด “นักเรียนออก / เข้าระหว่างปีการศึกษา” เลือกชื่อจากรายการ (drop down) แล้วเลือกว่าย้ายออกระหว่าง <b>เทอม 1</b> (ใส่ “ย้าย” ทั้ง 2 เทอม) หรือ <b>เทอม 2</b> (คงผลเทอม 1 ไว้ ใส่ “ย้าย” เฉพาะเทอม 2) — ไม่นำมาคำนวณ และนับจำนวนออกกลางปีในหน้าปกให้อัตโนมัติ · กด ✕ ที่ชื่อเพื่อยกเลิก คะแนนเดิมจะกลับมา</li>
       <li><b>ไม่มีรองผู้อำนวยการ</b> หรือ <b>ไม่มีหัวหน้างานวิชาการ</b>: เว้นว่างไว้ ระบบจะซ่อนบรรทัดลงนามนั้นและจัดตำแหน่งลายเซ็นให้เอง</li>
       <li>กด <b>เลือกรูปตรา</b> เพื่อใส่ตราโรงเรียน (PNG/JPG) จะแสดงบนหน้าปกทุกฉบับ</li>
       <li>กรอกจำนวนนักเรียนออกกลางปี / เข้าระหว่างปี (ถ้าไม่มี ใส่ 0) ใช้ในหน้าปก ปพ.5</li></ul>`],
@@ -1110,6 +1111,7 @@
     const ac = el.dataset && el.dataset.actChange;
     if (ac === 'subj') { U.slot = +el.value; refresh(); return; }
     if (ac === 'bopt') { U.book[el.value] = el.checked; refresh(); return; }
+    if (ac === 'moved-add') { const r = +el.value; el.value = ''; if (r) toggleMoved(r); return; }
     if (ac === 'stu-pick') { WB().setValue(L.sum, { r: 3, c: 2 }, el.value); refresh(); return; }
     if (!el.dataset || el.dataset.s === undefined) return;
     const sheet = el.dataset.s, r = +el.dataset.r, c = +el.dataset.c;
