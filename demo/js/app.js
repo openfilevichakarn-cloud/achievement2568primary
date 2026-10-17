@@ -86,7 +86,7 @@
     $('#login').hidden = true; $('#app').hidden = false; $('#loading').hidden = false;
     $('#loading-msg').textContent = 'กำลังโหลดโปรแกรม ' + roomLabel(g, room) + ' ...';
     try {
-      const resp = await fetch('data/p' + g + '.json?v=' + '20261017a');
+      const resp = await fetch('data/p' + g + '.json?v=' + '20261017b');
       if (!resp.ok) throw new Error('ไม่พบข้อมูลโปรแกรม ป.' + g);
       S.data = await resp.json();
     } catch (e) { $('#loading-msg').textContent = e.message; return; }
@@ -478,6 +478,29 @@
     }
     return { done, fail };
   }
+  // ข้อมูลระดับโรงเรียน (ข้อมูลพื้นฐาน: สังกัด B4, หัวหน้างานวิชาการ B6, รอง ผอ. B7, ผอ. B8, ปีการศึกษา B9)
+  // เก็บแยกตามห้อง — แก้ที่ห้องใดให้ตามไปทุกห้อง (เรียงคิวทีละครั้ง กันบันทึกชนกัน)
+  const SCHOOL_REFS = ['B4', 'B6', 'B7', 'B8', 'B9'];
+  let syncPend = null, syncRun = null;
+  function schoolInfoCells() {
+    const sh = S.wb.sheet(S.names.info), m = {};
+    for (const ref of SCHOOL_REFS) { const a = P.parseA1(ref); const v = S.wb.get(sh, a.r, a.c); m[ref] = v === null || v === undefined || String(v).trim() === '' ? null : v; }
+    return { [S.names.info]: m };
+  }
+  function syncSchoolInfo(refs) {
+    if (otherRoomCount() < 1) return Promise.resolve(null);
+    const all = schoolInfoCells()[S.names.info], m = {};
+    for (const ref of refs || SCHOOL_REFS) m[ref] = all[ref];
+    syncPend = { ...(syncPend || {}), ...m };
+    if (!syncRun) syncRun = (async () => {
+      let res = null;
+      while (syncPend) { const cells = { [S.names.info]: syncPend }; syncPend = null; res = await applyToSchool(cells); }
+      syncRun = null;
+      if (res && res.fail.length) toast('อัปเดตข้อมูลโรงเรียนไปห้องอื่นไม่สำเร็จ: ' + res.fail.join(', ') + ' — กดปุ่ม “ใช้ข้อมูลนี้กับทุกห้อง” อีกครั้ง', 'warn');
+      return res;
+    })();
+    return syncRun;
+  }
   function otherRoomCount() { return S.school.grades.reduce((n, g) => n + S.rooms[g].length, 0) - 1; }
 
   const BACKUP_TAG = 'pp56-backup';
@@ -809,6 +832,6 @@
   document.addEventListener('DOMContentLoaded', boot);
   window.PPApp = {
     S, ctx, toast, roomLabel, modal, applyValue, validate, markDirty, save, batch, printSheets, printOne, printAll, printBlock,
-    applyToSchool, otherRoomCount, classText, openDoc, closeDoc, refreshDoc, printSet, printScores, exportBackup, pickBackup, openCover, pickLogo: () => $('#logo-file').click(), removeLogo, setStatus, flushSave,
+    applyToSchool, otherRoomCount, classText, syncSchoolInfo, SCHOOL_REFS, openDoc, closeDoc, refreshDoc, printSet, printScores, exportBackup, pickBackup, openCover, pickLogo: () => $('#logo-file').click(), removeLogo, setStatus, flushSave,
   };
 })();
