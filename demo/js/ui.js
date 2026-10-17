@@ -218,7 +218,8 @@
         ${field('ชื่อ-สกุล หัวหน้างานวิชาการ', inputFor(i, 6, 2))}
         ${field('ชื่อ-สกุล รองผู้อำนวยการ (ถ้าไม่มี เว้นว่าง ระบบจะซ่อนลายเซ็น)', inputFor(i, 7, 2, { after: 'noop' }))}
         ${field('ชื่อ-สกุล ผู้อำนวยการ', inputFor(i, 8, 2))}
-      </div></div>
+      </div>
+      <p class="hint">ปีการศึกษา สังกัด และชื่อผู้บริหาร ใช้ร่วมกันทุกชั้นทุกห้อง — แก้ที่ห้องใดจะอัปเดตทุกห้องอัตโนมัติ${A().otherRoomCount() > 0 ? ' <button class="btn sm" data-act="info-school">🏫 ใช้ข้อมูลนี้กับทุกห้อง</button>' : ''}</p></div>
     <div class="card"><h3>ตราโรงเรียน</h3>
       <div class="row">${S.view.logo ? `<img src="${S.view.logo}" alt="ตราโรงเรียน" style="height:84px;width:84px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:12px">` : '<span class="hint">ยังไม่ได้ใส่ตรา</span>'}
         <button class="btn primary" data-act="logo">เลือกรูปตรา</button>${S.view.logo ? '<button class="btn danger" data-act="logo-del">ลบตรา</button>' : ''}</div>
@@ -1011,6 +1012,7 @@
       case 'as-add': asAdd(); break;
       case 'as-del': asDel(); break;
       case 'as-school': asSchool(); break;
+      case 'info-school': A().toast('กำลังอัปเดตทุกห้อง...', 'ok'); A().syncSchoolInfo().then(res => { if (res && !res.fail.length) A().toast('ใช้ข้อมูลโรงเรียนนี้กับทุกห้องแล้ว (' + res.done.length + ' ห้อง)', 'ok'); }); break;
       case 'ind-del': indDel(); break;
       case 'max-all': maxAll(); break;
       case 'sterm': U.scoreTerm = b.dataset.k === 'y' ? 'y' : +b.dataset.k; refresh(); break;
@@ -1073,6 +1075,8 @@
     el.dataset.old = el.value;
     if (el.dataset.t === 'pass') { el.classList.toggle('ok', val === 'ผ่าน'); el.classList.toggle('no', val === 'ไม่ผ่าน'); }
     const af = el.dataset.after;
+    // ข้อมูลระดับโรงเรียน (สังกัด / ผู้บริหาร / ปีการศึกษา): ใช้กับทุกห้องอัตโนมัติ
+    if (sheet === L.info && c === 2 && A().SCHOOL_REFS.includes('B' + r)) A().syncSchoolInfo(['B' + r]).then(res => { if (res && !res.fail.length) A().toast('อัปเดตทุกห้องแล้ว (' + res.done.length + ' ห้อง)', 'ok'); });
     if (af === 'grid') updateRo(el.closest('table'));
     // วาดหน้าใหม่หลังจบเหตุการณ์ change (กันวาดซ้อนตอนช่องที่โฟกัสอยู่ถูกลบแล้วเกิด blur)
     else if (af === 'rerender') setTimeout(refresh, 0);
