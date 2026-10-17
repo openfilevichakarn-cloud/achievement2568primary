@@ -32,7 +32,8 @@
   function hideReportRows(ctx) {
     const { wb, view, names } = ctx;
     const src = wb.sheet(names.sum);
-    const blank = (r) => { const v = wb.get(wb.sheet(names.info), r, 2); return String(v === null ? '' : v).trim().length === 0; };
+    // ว่าง = ไม่ได้กรอก หรือยังเป็นข้อความตัวอย่างในแบบฟอร์ม ("กรุณากรอก...")
+    const blank = (r) => { const v = String(wb.get(wb.sheet(names.info), r, 2) ?? '').trim(); return !v || /^กรุณากรอก/.test(v); };
     const noAcad = blank(6), noDeputy = blank(7);   // ข้อมูลพื้นฐาน B6 หัวหน้างานวิชาการ, B7 รอง ผอ.
     const rowMap = (nm) => { let m = view.rowHidden[nm]; if (!m) { m = new Map(); view.rowHidden[nm] = m; } return m; };
     view.mergeOv = view.mergeOv || {};
