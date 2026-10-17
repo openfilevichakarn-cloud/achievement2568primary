@@ -102,3 +102,6 @@ body.reg{height:auto;scroll-behavior:smooth}
 .rg-dt{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .rg-dt select{width:auto;min-width:64px}
 .rg-dt .rg-at{margin-left:6px;color:var(--muted)}
+
+.rg-stats{margin:10px 0 0;font-size:.85rem;color:var(--muted)}
+.rg-stats b{color:var(--ink)}

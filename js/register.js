@@ -22,6 +22,18 @@
     if (SALES.PHONE) items.push(`<a class="btn ${cls || ''}" href="tel:${esc(SALES.PHONE.replace(/[^\d+]/g, ''))}">โทร ${esc(SALES.PHONE)}</a>`);
     return items.join('');
   }
+  // สถิติผู้เข้าชม (ท้ายหน้า): นับ 1 ครั้งต่อการเปิดเบราว์เซอร์ 1 รอบ — ถ้ายังไม่ได้รัน sql/stats.sql จะไม่แสดง
+  async function visitStats() {
+    if (isDemo) return;
+    let hit = true; try { hit = !sessionStorage.getItem('pp_reg_seen'); sessionStorage.setItem('pp_reg_seen', '1'); } catch (e) { /* นับทุกครั้ง */ }
+    try {
+      const r = await fetch(`${base}/rest/v1/rpc/page_hit`, { method: 'POST', headers: H, body: JSON.stringify({ p_page: 'register', p_hit: hit }) });
+      if (!r.ok) return;
+      const s = await r.json(), f = (x) => Number(x || 0).toLocaleString('th-TH'), el = $('#rg-stats');
+      el.innerHTML = `👁 ผู้เข้าชม วันนี้ <b>${f(s.today)}</b> · เมื่อวาน <b>${f(s.yesterday)}</b> · เดือนนี้ <b>${f(s.month)}</b> · ทั้งหมด <b>${f(s.total)}</b> ครั้ง`;
+      el.hidden = false;
+    } catch (e) { /* ไม่แสดง */ }
+  }
   async function loadInfo() {
     if (isDemo) return { ok: true, price_per_grade: 500, price_all: 2500, auto: true, bank: 'ธนาคารกรุงไทย', account_no: '9600441464', account_name: 'นายเบญจรงค์ นุ่มวัฒนะ', demo: true };
     const r = await fetch(`${base}/rest/v1/rpc/sales_info`, { method: 'POST', headers: H, body: '{}' });
@@ -164,6 +176,7 @@
         q.style.color = slipQr ? 'var(--ok)' : 'var(--warn)';
       } catch (x) { slipData = null; slipQr = null; $('#reg-err').textContent = x.message; }
     });
+    visitStats();
     try { INFO = await loadInfo(); } catch (e) { INFO = { price_per_grade: null, price_all: null }; }
     renderPrice(); updateAmount();
 
