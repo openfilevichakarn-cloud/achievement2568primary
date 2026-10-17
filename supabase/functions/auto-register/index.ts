@@ -95,16 +95,27 @@ function slipDate(x: unknown): string {
 }
 const hhmm = (t: number) => { const d = new Date(t + 7 * 3600_000); return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`; };
 // ดึงค่าจากผลตรวจ (รองรับชื่อฟิลด์ทั้ง v1 / v2)
-function pickSlip(d: any): Slip {
+// ข้อมูลสลิปอาจซ้อนอยู่ในชั้นย่อย (เช่น v2: data.rawSlip) — หา object แรกที่มี transRef / receiver / date
+function slipCore(d: any): any {
+  const q: any[] = [d], seen = new Set();
+  while (q.length) {
+    const o = q.shift(); if (!o || typeof o !== 'object' || seen.has(o)) continue; seen.add(o);
+    if ('transRef' in o || ('receiver' in o && 'sender' in o)) return o;
+    for (const k of Object.keys(o)) if (o[k] && typeof o[k] === 'object' && !Array.isArray(o[k])) q.push(o[k]);
+  }
+  return d;
+}
+function pickSlip(top: any): Slip {
+  const d = slipCore(top) || {};
   const recv = d?.receiver || {}, acc = recv.account || {};
-  const amount = Number(d?.amount?.amount ?? d?.amount?.value ?? d?.amountInSlip ?? d?.amount);
-  const m = d?.matchedAccount || d?.matched_account;
+  const amount = Number(d?.amount?.amount ?? d?.amount?.value ?? top?.amountInSlip ?? d?.amount);
+  const m = top?.matchedAccount || top?.matched_account || d?.matchedAccount;
   const date = slipDate(d?.date || d?.transDate && `${d.transDate}T${d.transTime || '00:00:00'}` || d?.transactionDate || d?.transTimestamp || d?.dateTime || '');
   const account = String(acc.bank?.account || acc.proxy?.account || acc.value || acc.number || recv.bank?.account || recv.accountNumber || '');
   return { amount, date, transRef: String(d?.transRef || d?.transactionId || d?.ref || ''), account,
     name: String(acc.name?.th || acc.name?.en || recv.name?.th || recv.name || recv.displayName || ''),
     bank: String(recv.bank?.short || recv.bank?.shortCode || recv.bank?.code || ''),
-    matched: m && typeof m === 'object' ? String(m.bankNumber || m.accountNumber || m.account || '') : '', raw: d };
+    matched: m && typeof m === 'object' ? String(m.bankNumber || m.accountNumber || m.account || '') : '', raw: top };
 }
 // รหัส error ของ API v2 (เอกสาร EasySlip: ภาพรวม API v2 → รหัส Error)
 const V2_ERR: Record<string, 'quota' | 'unauthorized' | 'account' | 'slip' | 'down'> = {
