@@ -172,3 +172,10 @@ table.xl td.sx{font-family:'TH Sarabun New','Sarabun',sans-serif}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .login{background-image:linear-gradient(rgba(10,14,22,.45),rgba(10,14,22,.45)),url('../img/login-bg.webp')}}
 :root[data-theme="dark"] .login{background-image:linear-gradient(rgba(10,14,22,.45),rgba(10,14,22,.45)),url('../img/login-bg.webp')}
 .reg-link{text-align:center;margin:.8rem 0 0;font-size:.95rem}
+
+/* นักเรียนออกกลางปี (ย้าย) */
+.mvlist{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;max-height:260px;overflow:auto}
+.mvchip{font:inherit;font-size:.9rem;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+.mvchip:hover{border-color:var(--brand)}
+.mvchip.on{background:#fff7ed;border-color:#f59e0b;color:#92400e}
+input.gc.mv{color:#b45309;font-weight:600;background:#fff7ed}

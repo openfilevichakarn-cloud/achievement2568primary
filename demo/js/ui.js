@@ -74,6 +74,34 @@
   const activeInds = (sc, T) => SC[T].ind.filter(c => get(sc, 4, c) !== null && get(sc, 4, c) !== '');
   // ช่องที่ต้องกรอก = ตัวชี้วัดที่ใช้งาน + สอบ ที่คะแนนเต็มมากกว่า 0
   const scInputs = (sc, T) => [...activeInds(sc, T), SC[T].exam].filter(c => (num(sc, 4, c) ?? 0) > 0);
+  // นักเรียนออกกลางปี (ย้าย): ช่องคะแนน / คุณลักษณะ / กิจกรรม ทุกช่องเป็น "ย้าย" — สูตรนับ/รวมข้ามข้อความ จึงไม่ถูกนำมาคำนวณ
+  const MOVED = 'ย้าย';
+  const isMoved = (st) => !!L.trait(1) && txt(L.trait(1), stuTraitRow(st.r), 3) === MOVED;
+  function movedCells(st) {
+    const out = [], rs = stuScoreRow(st.r), rt = stuTraitRow(st.r);
+    for (const s of subjects()) for (const c of SC_EDIT) if (c !== SC.note) out.push([L.score(s.slot), rs, c]);
+    for (const kind of ['trait', 'act']) for (const t of [1, 2]) { const sh = asSheet(kind, t); if (sh) for (const c of range(3, AS[kind].max)) out.push([sh, rt, c]); }
+    return out;
+  }
+  function movedCounts() {
+    const mv = students().filter(isMoved), cov = L.cover1; if (!cov) return;
+    A().setRaw(cov, 8, 6, mv.filter(s => s.sex === 'ชาย').length);
+    A().setRaw(cov, 8, 9, mv.filter(s => s.sex === 'หญิง').length);
+  }
+  async function toggleMoved(r) {
+    const st = students().find(s => s.r === r); if (!st) return;
+    const on = !isMoved(st);
+    const ok = await uiModal(on
+      ? { title: 'นักเรียนออกกลางปี', ok: 'ตั้งเป็น “ย้าย”', danger: true, body: `<p>ตั้ง <b>${esc(st.name)}</b> เป็นนักเรียนออกกลางปี</p><ul class="hint" style="margin:6px 0 0 18px"><li>ใส่ “ย้าย” ในช่องคะแนนทุกวิชา คุณลักษณะ และกิจกรรม ทั้ง 2 เทอม (คะแนนที่กรอกไว้จะถูกแทนที่)</li><li>ไม่นำมาคำนวณผลและสถิติ · นับเป็น “ออกกลางปี” ในหน้าปก ปพ.5 อัตโนมัติ</li></ul>` }
+      : { title: 'ยกเลิกการย้าย', ok: 'ยกเลิกการย้าย', body: `<p>ยกเลิกสถานะย้ายของ <b>${esc(st.name)}</b>? ช่องที่เป็น “ย้าย” จะว่าง ต้องกรอกคะแนน/ผลประเมินใหม่</p>` });
+    if (!ok) return;
+    A().batch(() => {
+      for (const [sh, rr, c] of movedCells(st)) { const v = get(sh, rr, c); if (on || v === MOVED) A().setRaw(sh, rr, c, on ? MOVED : null); }
+      movedCounts();
+    });
+    A().toast(on ? `ตั้ง ${st.name} เป็นนักเรียนย้ายแล้ว` : `ยกเลิกการย้ายของ ${st.name} แล้ว`, 'ok');
+    refresh();
+  }
   function students() {
     const out = [];
     for (let r = L.stuFirst; r <= L.stuLast; r++) {
@@ -201,10 +229,14 @@
     const S = A().S, i = L.info;
     const cov = L.cover1;
     const covBox = cov ? `
-    <div class="card"><h3>นักเรียนออก / เข้าระหว่างปีการศึกษา</h3><p class="hint">ใช้ในหน้าปก ปพ.5 (ถ้าไม่มี ใส่ 0)</p>
+    <div class="card"><h3>นักเรียนออก / เข้าระหว่างปีการศึกษา</h3><p class="hint">ใช้ในหน้าปก ปพ.5 · นักเรียนออกกลางปีเลือกจากรายชื่อ ระบบใส่ “ย้าย” ในช่องคะแนน คุณลักษณะ กิจกรรมทุกช่อง และไม่นำมาคำนวณ</p>
       <div class="grid2">
-        ${field('ออกกลางปี — ชาย (คน)', inputFor(cov, 8, 6, { kind: 'n', mode: 'numeric' }))}
-        ${field('ออกกลางปี — หญิง (คน)', inputFor(cov, 8, 9, { kind: 'n', mode: 'numeric' }))}
+        ${field('ออกกลางปี — ชาย (คน)', `<input type="text" value="${esc(txt(cov, 8, 6) || '0')}" disabled>`)}
+        ${field('ออกกลางปี — หญิง (คน)', `<input type="text" value="${esc(txt(cov, 8, 9) || '0')}" disabled>`)}
+      </div>
+      <div class="fld" style="margin-top:10px"><span>เลือกนักเรียนที่ออกกลางปี (ย้าย) — นับจำนวนชาย/หญิงให้อัตโนมัติ</span>
+        <div class="mvlist">${students().map(st => { const m = isMoved(st); return `<button class="mvchip${m ? ' on' : ''}" data-act="moved" data-r="${st.r}" title="${m ? 'แตะเพื่อยกเลิกการย้าย' : 'แตะเพื่อตั้งเป็นนักเรียนย้าย'}">${m ? '✓ ' : ''}${esc(st.no)}. ${esc(st.name)}${m ? ' <b>ย้าย</b>' : ''}</button>`; }).join('') || '<span class="hint">ยังไม่มีรายชื่อนักเรียน</span>'}</div></div>
+      <div class="grid2">
         ${field('เข้าระหว่างปี — ชาย (คน)', inputFor(cov, 9, 6, { kind: 'n', mode: 'numeric' }))}
         ${field('เข้าระหว่างปี — หญิง (คน)', inputFor(cov, 9, 9, { kind: 'n', mode: 'numeric' }))}
       </div></div>` : '';
@@ -415,7 +447,7 @@
     o = o || {}; const raw = get(sheet, r, c); const v = raw === null || isPh(raw) ? '' : String(raw);
     const dis = kind === 'n' && sheet !== L.stu && (num(sheet, 4, c) ?? 0) <= 0;
     const extra = ` data-old="${esc(v)}" data-gr="${gr}" data-gc="${gc}" data-after="${o.after || 'grid'}"${o.lo !== undefined ? ` data-lo="${o.lo}" data-hi="${o.hi}"` : ''}`;
-    const cls = kind === 'pass' ? ` ${v === 'ผ่าน' ? 'ok' : v === 'ไม่ผ่าน' ? 'no' : ''}` : '';
+    const cls = (kind === 'pass' ? ` ${v === 'ผ่าน' ? 'ok' : v === 'ไม่ผ่าน' ? 'no' : ''}` : '') + (v === MOVED ? ' mv' : '');
     return `<td class="gtd ${o.cls || ''}"><input class="gc${cls}" ${bind(sheet, r, c, kind)}${extra} type="text" value="${esc(v)}"${kind === 'n' ? ' inputmode="decimal"' : ''}${o.align ? ` style="text-align:${o.align}"` : ''} autocomplete="off" spellcheck="false"${dis ? ' disabled title="ตั้งคะแนนเต็มก่อน"' : ''}></td>`;
   }
   // ช่องแสดงผล (คำนวณ): อัปเดตเองหลังแก้ไขในตาราง
@@ -608,7 +640,7 @@
   function assessSheet() { return U.kind === 'trait' ? L.trait(U.aTerm) : L.act(U.aTerm); }
   function setAssessAll(v, col) {
     const sheet = assessSheet(); const cols = col ? [col] : activeItems(U.kind);
-    A().batch(() => { for (const st of students()) for (const c of cols) setv(sheet, stuTraitRow(st.r), c, v === '' ? null : v); });
+    A().batch(() => { for (const st of students()) if (!isMoved(st)) for (const c of cols) setv(sheet, stuTraitRow(st.r), c, v === '' ? null : v); });
     refresh();
   }
 
@@ -730,7 +762,7 @@
   }
   // ตารางสรุป ปพ.5 ของเทอมที่เลือก (คำนวณจากชีทคะแนน/คุณลักษณะ/กิจกรรม)
   function p5Summary(T, subs) {
-    const stu = students(), n = stu.length;
+    const all = students(), stu = all.filter(s => !isMoved(s)), n = stu.length, nMv = all.length - n;
     const col = T === 'sum' ? { tot: SC.year, lvl: SC.yearLvl } : { tot: SC[T].tot, lvl: SC[T].lvl };
     const male = stu.filter(s => s.sex === 'ชาย').length, female = stu.filter(s => s.sex === 'หญิง').length;
     const fmt = (x, d = 1) => x === null ? '–' : (Math.round(x * 10 ** d) / 10 ** d).toLocaleString('th-TH');
@@ -759,7 +791,7 @@
     };
     const tLabel = T === 'sum' ? 'ทั้งปี' : 'เทอม ' + T;
     return `<div class="p5stats">
-        <div class="stat"><b>${n}</b><span>นักเรียน (ชาย ${male} · หญิง ${female})</span></div>
+        <div class="stat"><b>${n}</b><span>นักเรียน (ชาย ${male} · หญิง ${female})${nMv ? ` · ไม่นับย้ายออก ${nMv} คน` : ''}</span></div>
         <div class="stat"><b>${rows.length}</b><span>รายวิชา</span></div>
         <div class="stat"><b>${need ? Math.round(filled / need * 100) : 0}%</b><span>กรอกคะแนนแล้ว (${tLabel})</span></div>
         <div class="stat"><b>${fmt(avgPct)}${avgPct === null ? '' : '%'}</b><span>คะแนนเฉลี่ยทุกวิชา</span></div>
@@ -914,6 +946,7 @@
     ['school', 'ตั้งค่าข้อมูลโรงเรียน', 'data:school', `
       <p>เมนู <b>ข้อมูล → โรงเรียน</b></p>
       <ul><li>กรอกปีการศึกษา สังกัด ชื่อครูประจำชั้น หัวหน้างานวิชาการ รองผู้อำนวยการ และผู้อำนวยการ — ชื่อจะไปปรากฏในช่องลงนามของ ปพ.5 / ปพ.6 อัตโนมัติ</li>
+      <li><b>นักเรียนออกกลางปี (ย้าย)</b>: ในการ์ด “นักเรียนออก / เข้าระหว่างปีการศึกษา” แตะชื่อนักเรียน — ระบบใส่ “ย้าย” ในช่องคะแนน คุณลักษณะ กิจกรรมทุกช่อง ไม่นำมาคำนวณ และนับจำนวนออกกลางปีในหน้าปกให้อัตโนมัติ (แตะอีกครั้งเพื่อยกเลิก)</li>
       <li><b>ไม่มีรองผู้อำนวยการ</b> หรือ <b>ไม่มีหัวหน้างานวิชาการ</b>: เว้นว่างไว้ ระบบจะซ่อนบรรทัดลงนามนั้นและจัดตำแหน่งลายเซ็นให้เอง</li>
       <li>กด <b>เลือกรูปตรา</b> เพื่อใส่ตราโรงเรียน (PNG/JPG) จะแสดงบนหน้าปกทุกฉบับ</li>
       <li>กรอกจำนวนนักเรียนออกกลางปี / เข้าระหว่างปี (ถ้าไม่มี ใส่ 0) ใช้ในหน้าปก ปพ.5</li></ul>`],
@@ -1021,6 +1054,7 @@
       case 'aterm': U.aTerm = b.dataset.k === 'y' ? 'y' : +b.dataset.k; refresh(); break;
       case 'acol': setAssessAll('ผ่าน', +b.dataset.c); break;
       case 'aall': setAssessAll(b.dataset.v); break;
+      case 'moved': toggleMoved(+b.dataset.r); break;
       case 'rmode': U.repMode = b.dataset.k; refresh(); break;
       case 'rterm': U.repTerm = ['sum', 'stage'].includes(b.dataset.k) ? b.dataset.k : +b.dataset.k; refresh(); break;
       case 'stu-step': stepStudent(+b.dataset.d); break;
